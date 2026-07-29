@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Card Key — codes to hand out</title>
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="assets/sc.css">
+<style>
+  .codes { display: grid; gap: 18px; }
+  .code { background: var(--card); border: 1px solid var(--rule); padding: 18px; }
+  .code .art { background: #fff; border: 1px solid var(--rule-soft); padding: 14px; text-align: center; }
+  .code canvas { width: 100%; max-width: 260px; height: auto; image-rendering: pixelated; }
+  .code h3 { margin: 0 0 4px; }
+  .tag { font-family: var(--mono); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+  @media (min-width: 620px) { .codes { grid-template-columns: 1fr 1fr; } .codes .wide { grid-column: 1 / -1; } }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="top-in">
+    <svg class="mark on" viewBox="0 0 7 7" aria-hidden="true">
+      <rect x="0" y="0" width="7" height="1"/><rect x="0" y="6" width="7" height="1"/>
+      <rect x="0" y="1" width="1" height="5"/><rect x="6" y="1" width="1" height="5"/>
+      <rect x="2" y="2" width="3" height="3"/>
+    </svg>
+    <div>
+      <h1>Codes to hand out</h1>
+      <p class="sub">Scan, print, or download</p>
+    </div>
+    <nav><a href="index.html">Site</a> <a href="tool.html">Tool</a></nav>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <p class="lede">Three codes. One is you, two are doors.</p>
+  <p class="small">Every code below is drawn fresh in this page from the data underneath it, so what you see is what will scan. Open this page on any phone and the codes are there &mdash; nothing to sync, nothing to install.</p>
+
+  <div class="codes">
+
+    <div class="code wide">
+      <p class="tag">Contact card</p>
+      <h3 id="cName">&nbsp;</h3>
+      <p class="small" id="cDetail">&nbsp;</p>
+      <div class="art"><canvas id="qContact" role="img" aria-label="Contact card QR code"></canvas></div>
+      <div class="readout"><span id="rContact">&nbsp;</span><span id="vContact">&nbsp;</span></div>
+      <div class="btnrow" style="margin-top:12px">
+        <button type="button" id="saveVcf">Save to this phone</button>
+        <button type="button" class="ghost" data-dl="contact">PNG</button>
+        <button type="button" class="ghost" data-svg="contact">SVG</button>
+        <button type="button" class="ghost" data-print="contact">Print 8 cards</button>
+      </div>
+      <p class="small" style="margin:12px 0 0"><b>Save to this phone</b> hands the device a real contact file. It lands in Contacts complete and spelled right, which scanning across a noisy room does not guarantee.</p>
+    </div>
+
+    <div class="code">
+      <p class="tag">Contact card, by link</p>
+      <h3>The easy scan</h3>
+      <p class="small">This code holds a short web address instead of the card itself, so it is far easier for an older camera to catch. Scanning it downloads the contact file. Needs a signal at the moment of scanning.</p>
+      <div class="art"><canvas id="qVcf" role="img" aria-label="QR code linking to the contact file"></canvas></div>
+      <div class="readout"><span id="rVcf">&nbsp;</span><span></span></div>
+      <div class="btnrow" style="margin-top:12px">
+        <button type="button" data-dl="vcf">Download PNG</button>
+        <button type="button" class="ghost" data-svg="vcf">SVG</button>
+      </div>
+    </div>
+
+    <div class="code">
+      <p class="tag">Door 1</p>
+      <h3>The tool</h3>
+      <p class="small">Point people here. They land on the page that takes a key and opens the generator.</p>
+      <div class="art"><canvas id="qTool" role="img" aria-label="QR code linking to the tool"></canvas></div>
+      <div class="readout"><span id="rTool">&nbsp;</span><span></span></div>
+      <div class="btnrow" style="margin-top:12px">
+        <button type="button" data-dl="tool">Download PNG</button>
+        <button type="button" class="ghost" data-svg="tool">Download SVG</button>
+      </div>
+    </div>
+
+    <div class="code">
+      <p class="tag">Door 2 &mdash; yours</p>
+      <h3>The key generator</h3>
+      <p class="small">Your own door. Scan it with your phone to issue a key from anywhere. Anyone else who opens it just makes keys that your published list will never recognise.</p>
+      <div class="art"><canvas id="qAdmin" role="img" aria-label="QR code linking to the key generator"></canvas></div>
+      <div class="readout"><span id="rAdmin">&nbsp;</span><span></span></div>
+      <div class="btnrow" style="margin-top:12px">
+        <button type="button" data-dl="admin">Download PNG</button>
+        <button type="button" class="ghost" data-svg="admin">Download SVG</button>
+      </div>
+    </div>
+
+  </div>
+
+  <h2>Changing your details</h2>
+  <p class="small">The contact card above is built from a block near the bottom of this file. Edit the values, commit, and the code changes everywhere this page is open. The download buttons always reflect what is on screen, so there are no stale image files to keep in step.</p>
+
+  <footer>
+    <p>Printing uses PNG deliberately. Browsers drop SVG out of print jobs without saying so, which is how a card ends up with an empty square where the code should be.</p>
+  </footer>
+
+</main>
+
+<script src="assets/qrcode.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  /* ===== EDIT THIS BLOCK ===== */
+  var ME = {
+    first:   'Logan',
+    last:    'Lorentz',
+    full:    'Logan Royce Lorentz',
+    phone:   '+1 405 230 2902',
+    email:   'Logan.Lorentz9@gmail.com',
+    title:   '',
+    org:     ''
+  };
+  var TOOL_URL  = 'https://joeromance84.github.io/card-key/';
+  var ADMIN_URL = 'https://joeromance84.github.io/card-key-admin/';
+  var VCF_URL   = 'https://joeromance84.github.io/card-key/card.vcf';
+  /* =========================== */
+
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
+  }
+
+  function vcard() {
+    var L = ['BEGIN:VCARD', 'VERSION:3.0'];
+    L.push('N:' + esc(ME.last) + ';' + esc(ME.first) + ';;;');
+    L.push('FN:' + esc(ME.full));
+    if (ME.org) { L.push('ORG:' + esc(ME.org)); }
+    if (ME.title) { L.push('TITLE:' + esc(ME.title)); }
+    if (ME.phone) { L.push('TEL;TYPE=CELL,VOICE:' + esc(ME.phone)); }
+    if (ME.email) { L.push('EMAIL;TYPE=INTERNET:' + esc(ME.email)); }
+    L.push('END:VCARD');
+    return L.join('\n');
+  }
+
+  function draw(canvas, data, ecc, px) {
+    var qr = qrcode(0, ecc);
+    qr.addData(data);
+    qr.make();
+    var n = qr.getModuleCount(), q = 4;
+    var cell = Math.max(1, Math.floor((px || 900) / (n + q * 2)));
+    var size = cell * (n + q * 2);
+    canvas.width = size; canvas.height = size;
+    var c = canvas.getContext('2d');
+    c.fillStyle = '#fff'; c.fillRect(0, 0, size, size);
+    c.fillStyle = '#000';
+    for (var r = 0; r < n; r++) {
+      for (var col = 0; col < n; col++) {
+        if (qr.isDark(r, col)) { c.fillRect((col + q) * cell, (r + q) * cell, cell, cell); }
+      }
+    }
+    return n;
+  }
+
+  function verdict(n) {
+    if (n <= 45) { return 'Reads across a room'; }
+    if (n <= 65) { return 'Reads at arm\'s length'; }
+    if (n <= 89) { return 'Hold it close'; }
+    return 'Dense — print it large';
+  }
+
+  var CARD = vcard();
+  var items = {
+    contact: { canvas: 'qContact', data: CARD, ecc: 'M', file: 'logan-lorentz-contact' },
+    tool:    { canvas: 'qTool',    data: TOOL_URL,  ecc: 'Q', file: 'card-key-tool-link' },
+    admin:   { canvas: 'qAdmin',   data: ADMIN_URL, ecc: 'Q', file: 'card-key-admin-link' },
+    vcf:     { canvas: 'qVcf',     data: VCF_URL,   ecc: 'Q', file: 'contact-card-link' }
+  };
+
+  var n1 = draw(document.getElementById('qContact'), CARD, 'M');
+  document.getElementById('cName').textContent = ME.full;
+  document.getElementById('cDetail').textContent = ME.phone + ' · ' + ME.email;
+  document.getElementById('rContact').textContent = n1 + '×' + n1 + ' modules';
+  document.getElementById('vContact').textContent = verdict(n1);
+
+  var n2 = draw(document.getElementById('qTool'), TOOL_URL, 'Q');
+  document.getElementById('rTool').textContent = n2 + '×' + n2 + ' · ' + verdict(n2);
+
+  var n3 = draw(document.getElementById('qAdmin'), ADMIN_URL, 'Q');
+  document.getElementById('rAdmin').textContent = n3 + '×' + n3 + ' · ' + verdict(n3);
+
+  var n4 = draw(document.getElementById('qVcf'), VCF_URL, 'Q');
+  document.getElementById('rVcf').textContent = n4 + '×' + n4 + ' · ' + verdict(n4);
+
+  document.getElementById('saveVcf').onclick = function () {
+    saveBlob(new Blob([CARD], { type: 'text/vcard;charset=utf-8' }),
+             (ME.first + '-' + ME.last).toLowerCase().replace(/[^a-z0-9-]+/g, '-') + '.vcf');
+  };
+
+  function svgString(data, ecc) {
+    var qr = qrcode(0, ecc); qr.addData(data); qr.make();
+    var n = qr.getModuleCount(), q = 4, total = n + q * 2, d = '';
+    for (var r = 0; r < n; r++) {
+      for (var c = 0; c < n; c++) {
+        if (qr.isDark(r, c)) { d += 'M' + (c + q) + ' ' + (r + q) + 'h1v1h-1z'; }
+      }
+    }
+    return '<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' +
+      total + ' ' + total + '" shape-rendering="crispEdges"><rect width="' + total + '" height="' + total +
+      '" fill="#ffffff"/><path d="' + d + '" fill="#000000"/></svg>';
+  }
+
+  function saveBlob(blob, name) {
+    var u = URL.createObjectURL(blob), a = document.createElement('a');
+    a.href = u; a.download = name;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(u); }, 4000);
+  }
+
+  var svgs = document.querySelectorAll('[data-svg]');
+  for (var s = 0; s < svgs.length; s++) {
+    (function (btn) {
+      btn.onclick = function () {
+        var it = items[btn.getAttribute('data-svg')];
+        saveBlob(new Blob([svgString(it.data, it.ecc)], { type: 'image/svg+xml' }), it.file + '.svg');
+      };
+    })(svgs[s]);
+  }
+
+  /* Downloads */
+  var dls = document.querySelectorAll('[data-dl]');
+  for (var i = 0; i < dls.length; i++) {
+    (function (btn) {
+      btn.onclick = function () {
+        var it = items[btn.getAttribute('data-dl')];
+        var tmp = document.createElement('canvas');
+        var px = draw(tmp, it.data, it.ecc, 1024);
+        tmp.toBlob(function (b) {
+          var u = URL.createObjectURL(b), a = document.createElement('a');
+          a.href = u; a.download = it.file + '-' + tmp.width + '.png';
+          document.body.appendChild(a); a.click(); document.body.removeChild(a);
+          setTimeout(function () { URL.revokeObjectURL(u); }, 4000);
+        }, 'image/png');
+      };
+    })(dls[i]);
+  }
+
+  /* Print sheet */
+  var pr = document.querySelector('[data-print]');
+  pr.onclick = function () {
+    var tmp = document.createElement('canvas');
+    draw(tmp, CARD, 'M', 1024);
+    var png = tmp.toDataURL('image/png'), cards = '';
+    for (var i = 0; i < 8; i++) {
+      cards += '<div class="c"><img src="' + png + '" alt=""><div class="t"><b>' + ME.full + '</b>' +
+        (ME.title ? '<span>' + ME.title + '</span>' : '') +
+        '<span>' + ME.phone + '</span><span>' + ME.email + '</span></div></div>';
+    }
+    var w = window.open('', '_blank');
+    if (!w) { window.alert('Allow pop-ups for this page, then try again.'); return; }
+    w.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Card sheet</title><style>' +
+      '@page{size:letter;margin:12mm}' +
+      'body{margin:0;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;display:grid;grid-template-columns:1fr 1fr;gap:6mm}' +
+      '.c{border:1px dashed #bbb;padding:5mm;display:flex;gap:4mm;align-items:center;break-inside:avoid}' +
+      '.c img{width:32mm;height:32mm;image-rendering:pixelated}' +
+      '.t{display:flex;flex-direction:column;gap:1mm;font-size:10pt;min-width:0}' +
+      '.t b{font-size:12pt}.t span{color:#555;overflow-wrap:anywhere}' +
+      '</style></head><body>' + cards + '</body></html>');
+    w.document.close(); w.focus();
+    setTimeout(function () { w.print(); }, 350);
+  };
+})();
+</script>
+</body>
+</html>

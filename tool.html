@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Card Key — build your code</title>
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="assets/sc.css">
+</head>
+<body>
+
+<header class="top">
+  <div class="top-in">
+    <svg class="mark on" id="hdrMark" viewBox="0 0 7 7" aria-hidden="true">
+      <rect x="0" y="0" width="7" height="1"/><rect x="0" y="6" width="7" height="1"/>
+      <rect x="0" y="1" width="1" height="5"/><rect x="6" y="1" width="1" height="5"/>
+      <rect x="2" y="2" width="3" height="3"/>
+    </svg>
+    <div>
+      <h1>Card Key</h1>
+      <p class="sub" id="hdrSub">Checking your key…</p>
+    </div>
+    <nav><a href="index.html">Home</a></nav>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <!-- Locked state -->
+  <section id="locked" class="hidden">
+    <p class="lede">This tool is locked on this device.</p>
+    <p>A key unlocks it. If you already have one, enter it on the home page &mdash; it only takes a moment and it stays unlocked here until the key runs out.</p>
+    <p class="small">If you unlocked this on another phone or computer, the key works there separately. Enter it again here.</p>
+    <p><a class="btn" href="index.html#key">Enter a key</a></p>
+  </section>
+
+  <!-- Unlocked state -->
+  <section id="app" class="hidden">
+
+    <h2>1 &middot; What the code should carry</h2>
+    <div class="panel tight">
+      <label for="mode">Code contents</label>
+      <select id="mode">
+        <option value="vcard">Contact card &mdash; saves into the phone's contacts</option>
+        <option value="url">One link &mdash; opens a single web address</option>
+        <option value="text">Plain text &mdash; shows a message</option>
+      </select>
+    </div>
+
+    <!-- URL mode -->
+    <div id="paneUrl" class="panel hidden">
+      <label for="soleUrl">Web address</label>
+      <input id="soleUrl" type="url" placeholder="https://example.com/book">
+      <p class="small" style="margin:0">One link scans faster and from further away than a full contact card. Good for a booking page or a link hub.</p>
+    </div>
+
+    <!-- Text mode -->
+    <div id="paneText" class="panel hidden">
+      <label for="soleText">Message</label>
+      <textarea id="soleText" placeholder="Anything you want to appear on the scanning phone."></textarea>
+    </div>
+
+    <!-- vCard mode -->
+    <div id="paneCard">
+      <h2>2 &middot; You</h2>
+      <div class="panel">
+        <div class="row">
+          <div><label for="fFirst">First name</label><input id="fFirst" type="text" autocomplete="given-name"></div>
+          <div><label for="fLast">Last name</label><input id="fLast" type="text" autocomplete="family-name"></div>
+        </div>
+        <div class="row">
+          <div><label for="fPhone">Mobile</label><input id="fPhone" type="tel" autocomplete="tel" placeholder="+1 918 555 0134"></div>
+          <div><label for="fEmail">Email</label><input id="fEmail" type="email" autocomplete="email"></div>
+        </div>
+        <div class="row">
+          <div><label for="fTitle">Job title</label><input id="fTitle" type="text" autocomplete="organization-title"></div>
+          <div><label for="fOrg">Company</label><input id="fOrg" type="text" autocomplete="organization"></div>
+        </div>
+        <label for="fTagline">Tagline</label>
+        <input id="fTagline" type="text" placeholder="One line on what you do">
+      </div>
+
+      <h2>3 &middot; Where to find you</h2>
+      <div class="panel">
+        <div class="row">
+          <div><label for="fSite">Website</label><input id="fSite" type="url" placeholder="example.com"></div>
+          <div><label for="fPortfolio">Portfolio</label><input id="fPortfolio" type="url" placeholder="example.com/work"></div>
+        </div>
+        <label for="fBooking">Booking link</label>
+        <input id="fBooking" type="url" placeholder="cal.example.com/you">
+
+        <label style="margin-top:6px">Social accounts</label>
+        <div id="socials"></div>
+        <button type="button" class="ghost" id="addSocial" style="margin-top:4px">Add another account</button>
+      </div>
+
+      <h2>4 &middot; Address and preference</h2>
+      <div class="panel">
+        <label for="fStreet">Street</label>
+        <input id="fStreet" type="text" autocomplete="street-address">
+        <div class="row">
+          <div><label for="fCity">City</label><input id="fCity" type="text" autocomplete="address-level2"></div>
+          <div><label for="fRegion">State or region</label><input id="fRegion" type="text" autocomplete="address-level1"></div>
+        </div>
+        <div class="row">
+          <div><label for="fPostal">Postcode</label><input id="fPostal" type="text" autocomplete="postal-code"></div>
+          <div><label for="fCountry">Country</label><input id="fCountry" type="text" autocomplete="country-name"></div>
+        </div>
+        <label for="fPref">Reach me first by</label>
+        <select id="fPref">
+          <option value="">Don't say</option>
+          <option>Text message</option>
+          <option>Phone call</option>
+          <option>Email</option>
+          <option>WhatsApp</option>
+          <option>Signal</option>
+          <option>LinkedIn</option>
+          <option>Instagram</option>
+          <option>The booking link</option>
+        </select>
+      </div>
+    </div>
+
+    <h2>5 &middot; The code</h2>
+    <div class="panel">
+      <div class="row">
+        <div>
+          <label for="ecc">Damage tolerance</label>
+          <select id="ecc">
+            <option value="L">Low &mdash; smallest code</option>
+            <option value="M" selected>Medium &mdash; recommended</option>
+            <option value="Q">High &mdash; for cards that get handled</option>
+            <option value="H">Highest &mdash; for signage and stickers</option>
+          </select>
+        </div>
+        <div>
+          <label for="px">Download size</label>
+          <select id="px">
+            <option value="512">512 px &mdash; screens and email</option>
+            <option value="1024" selected>1024 px &mdash; general use</option>
+            <option value="2048">2048 px &mdash; large print</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="stage" id="stage">
+        <canvas id="qrCanvas" width="300" height="300" role="img" aria-label="Your QR code"></canvas>
+      </div>
+
+      <div style="margin-top:14px">
+        <div class="meter" id="meter"><i id="meterFill"></i></div>
+        <div class="readout">
+          <span id="roSize">&nbsp;</span>
+          <span id="roVerdict">&nbsp;</span>
+        </div>
+      </div>
+
+      <div class="note" id="qrMsg" role="status" aria-live="polite"></div>
+
+      <div class="btnrow" style="margin-top:8px">
+        <button type="button" id="dlVcf">Save contact file</button>
+        <button type="button" id="dlPng">Download PNG</button>
+        <button type="button" class="ghost" id="dlSvg">Download SVG</button>
+        <button type="button" class="ghost" id="printBtn">Print a card sheet</button>
+      </div>
+      <p class="small" style="margin:12px 0 0"><b>Save contact file</b> gives you a <span class="mono">.vcf</span> &mdash; open it on a phone and it goes straight into Contacts, no scanning and no typos. Send it by message or email when the person is not standing in front of you.</p>
+      <p class="small" style="margin:12px 0 0">The print sheet uses the PNG on purpose. Browsers routinely drop SVG images out of a print job without warning, which is how people end up with cards that have a blank square where the code should be. Keep the SVG for a designer or a sign shop.</p>
+    </div>
+
+    <h2>6 &middot; This device</h2>
+    <div class="panel tight">
+      <div class="btnrow">
+        <button type="button" class="ghost" id="saveDraft">Save these details here</button>
+        <button type="button" class="ghost" id="wipe">Erase everything</button>
+      </div>
+      <p class="small" id="draftMsg" style="margin:12px 0 0">Saving keeps your details in this browser only, so you don't retype them next time. Erasing clears them and signs the key out of this device.</p>
+    </div>
+
+    <footer>
+      <p class="mono" style="font-size:12px" id="footKey"></p>
+      <p>Codes you have already made keep working forever. They contain your details directly &mdash; they don't point back here.</p>
+    </footer>
+  </section>
+
+</main>
+
+<script src="assets/qrcode.js"></script>
+<script src="assets/sc-core.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  /* ---------- Gate ---------- */
+  var token = SC.activeToken();
+  if (!token) {
+    document.getElementById('locked').className = '';
+    document.getElementById('hdrSub').textContent = 'Locked';
+    document.getElementById('hdrMark').className.baseVal = 'mark';
+    return;
+  }
+  document.getElementById('app').className = '';
+  var left = SC.daysLeft(token.expires);
+  document.getElementById('hdrSub').textContent =
+    'Unlocked · ' + left + ' day' + (left === 1 ? '' : 's') + ' left';
+  document.getElementById('footKey').textContent =
+    SC.formatKey(token.key) + ' · expires ' + token.expires;
+
+  var $ = function (id) { return document.getElementById(id); };
+
+  /* ---------- Social networks ---------- */
+  var NETS = [
+    ['linkedin', 'LinkedIn', 'https://www.linkedin.com/in/'],
+    ['facebook', 'Facebook', 'https://www.facebook.com/'],
+    ['instagram', 'Instagram', 'https://www.instagram.com/'],
+    ['x', 'X', 'https://x.com/'],
+    ['tiktok', 'TikTok', 'https://www.tiktok.com/@'],
+    ['youtube', 'YouTube', 'https://www.youtube.com/@'],
+    ['github', 'GitHub', 'https://github.com/'],
+    ['threads', 'Threads', 'https://www.threads.net/@'],
+    ['pinterest', 'Pinterest', 'https://www.pinterest.com/'],
+    ['snapchat', 'Snapchat', 'https://www.snapchat.com/add/'],
+    ['whatsapp', 'WhatsApp', 'https://wa.me/'],
+    ['other', 'Other', '']
+  ];
+
+  function socialRow(net, val) {
+    var wrap = document.createElement('div');
+    wrap.className = 'row';
+    wrap.style.marginBottom = '2px';
+    var sel = document.createElement('select');
+    sel.style.flex = '0 1 130px';
+    for (var i = 0; i < NETS.length; i++) {
+      var o = document.createElement('option');
+      o.value = NETS[i][0]; o.textContent = NETS[i][1];
+      if (net === NETS[i][0]) { o.selected = true; }
+      sel.appendChild(o);
+    }
+    var inp = document.createElement('input');
+    inp.type = 'text';
+    inp.placeholder = 'handle or full link';
+    inp.value = val || '';
+    inp.style.flex = '2 1 180px';
+    var del = document.createElement('button');
+    del.type = 'button'; del.className = 'ghost'; del.textContent = '×';
+    del.setAttribute('aria-label', 'Remove this account');
+    del.style.flex = '0 0 44px'; del.style.padding = '11px 0'; del.style.marginBottom = '14px';
+    del.onclick = function () { wrap.parentNode.removeChild(wrap); render(); };
+    sel.onchange = render; inp.oninput = render;
+    wrap.appendChild(sel); wrap.appendChild(inp); wrap.appendChild(del);
+    wrap.getData = function () { return { net: sel.value, val: inp.value.trim() }; };
+    return wrap;
+  }
+
+  function addSocial(net, val) {
+    $('socials').appendChild(socialRow(net, val));
+  }
+
+  function readSocials() {
+    var rows = $('socials').children, out = [], i, d;
+    for (i = 0; i < rows.length; i++) {
+      d = rows[i].getData();
+      if (d.val) { out.push(d); }
+    }
+    return out;
+  }
+
+  function expandSocial(net, val) {
+    if (/^https?:\/\//i.test(val)) { return val; }
+    if (/^www\./i.test(val) || /^[\w-]+\.[a-z]{2,}\//i.test(val)) { return 'https://' + val; }
+    var base = '';
+    for (var i = 0; i < NETS.length; i++) { if (NETS[i][0] === net) { base = NETS[i][2]; } }
+    if (!base) { return val; }
+    return base + val.replace(/^@/, '').replace(/^\+/, '');
+  }
+
+  $('addSocial').onclick = function () { addSocial('linkedin', ''); render(); };
+
+  /* ---------- vCard ---------- */
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
+  }
+
+  function tidyUrl(u) {
+    u = String(u || '').trim();
+    if (!u) { return ''; }
+    return /^[a-z][a-z0-9+.-]*:/i.test(u) ? u : 'https://' + u;
+  }
+
+  function buildVCard() {
+    var L = [];
+    var first = $('fFirst').value.trim(), last = $('fLast').value.trim();
+    var full = (first + ' ' + last).trim();
+
+    L.push('BEGIN:VCARD');
+    L.push('VERSION:3.0');
+    if (first || last) { L.push('N:' + esc(last) + ';' + esc(first) + ';;;'); }
+    if (full) { L.push('FN:' + esc(full)); }
+    if ($('fOrg').value.trim()) { L.push('ORG:' + esc($('fOrg').value.trim())); }
+    if ($('fTitle').value.trim()) { L.push('TITLE:' + esc($('fTitle').value.trim())); }
+    if ($('fPhone').value.trim()) { L.push('TEL;TYPE=CELL,VOICE:' + esc($('fPhone').value.trim())); }
+    if ($('fEmail').value.trim()) { L.push('EMAIL;TYPE=INTERNET:' + esc($('fEmail').value.trim())); }
+
+    var adr = [$('fStreet').value.trim(), $('fCity').value.trim(), $('fRegion').value.trim(),
+               $('fPostal').value.trim(), $('fCountry').value.trim()];
+    if (adr.join('')) {
+      L.push('ADR;TYPE=WORK:;;' + esc(adr[0]) + ';' + esc(adr[1]) + ';' + esc(adr[2]) + ';' + esc(adr[3]) + ';' + esc(adr[4]));
+    }
+
+    var site = tidyUrl($('fSite').value), port = tidyUrl($('fPortfolio').value), book = tidyUrl($('fBooking').value);
+    if (site) { L.push('URL:' + esc(site)); }
+    if (port) { L.push('URL;TYPE=portfolio:' + esc(port)); }
+    if (book) { L.push('URL;TYPE=booking:' + esc(book)); }
+
+    var socials = readSocials(), i, u;
+    for (i = 0; i < socials.length; i++) {
+      u = expandSocial(socials[i].net, socials[i].val);
+      L.push('X-SOCIALPROFILE;TYPE=' + socials[i].net + ':' + esc(u));
+    }
+
+    var note = [];
+    if ($('fTagline').value.trim()) { note.push($('fTagline').value.trim()); }
+    if ($('fPref').value) { note.push('Reach me first by: ' + $('fPref').value); }
+    if (note.length) { L.push('NOTE:' + esc(note.join(' — '))); }
+
+    L.push('END:VCARD');
+    return L.join('\n');
+  }
+
+  function payload() {
+    var m = $('mode').value;
+    if (m === 'url') { return tidyUrl($('soleUrl').value); }
+    if (m === 'text') { return $('soleText').value.trim(); }
+    return buildVCard();
+  }
+
+  /* ---------- Render ---------- */
+  var currentQR = null, currentData = '';
+
+  function drawCanvas(qr, canvas, px) {
+    var count = qr.getModuleCount();
+    var quiet = 4;
+    var cell = Math.max(1, Math.floor(px / (count + quiet * 2)));
+    var size = cell * (count + quiet * 2);
+    canvas.width = size; canvas.height = size;
+    var c = canvas.getContext('2d');
+    c.fillStyle = '#ffffff';
+    c.fillRect(0, 0, size, size);
+    c.fillStyle = '#000000';
+    for (var r = 0; r < count; r++) {
+      for (var col = 0; col < count; col++) {
+        if (qr.isDark(r, col)) {
+          c.fillRect((col + quiet) * cell, (r + quiet) * cell, cell, cell);
+        }
+      }
+    }
+    return size;
+  }
+
+  function svgString(qr) {
+    var count = qr.getModuleCount(), quiet = 4, total = count + quiet * 2, d = '';
+    for (var r = 0; r < count; r++) {
+      for (var c = 0; c < count; c++) {
+        if (qr.isDark(r, c)) { d += 'M' + (c + quiet) + ' ' + (r + quiet) + 'h1v1h-1z'; }
+      }
+    }
+    return '<?xml version="1.0" encoding="UTF-8"?>\n' +
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + total + ' ' + total + '" shape-rendering="crispEdges">' +
+      '<rect width="' + total + '" height="' + total + '" fill="#ffffff"/>' +
+      '<path d="' + d + '" fill="#000000"/></svg>';
+  }
+
+  function verdict(count) {
+    if (count <= 45) { return ['Easy to scan from a distance', '', 0]; }
+    if (count <= 65) { return ['Scans quickly at arm\'s length', '', 0]; }
+    if (count <= 89) { return ['Fine on a card held close', 'warn', 1]; }
+    if (count <= 117) { return ['Dense — print it at least 4 cm across', 'warn', 1]; }
+    return ['Very dense — older phone cameras will struggle', 'over', 2];
+  }
+
+  function say(text, kind) {
+    var m = $('qrMsg');
+    m.className = 'note' + (kind ? ' ' + kind : '');
+    m.textContent = text || '';
+  }
+
+  function render() {
+    var data = payload();
+    currentData = data;
+    var canvas = $('qrCanvas');
+    var fill = $('meterFill'), meter = $('meter');
+
+    if (!data || data === 'BEGIN:VCARD\nVERSION:3.0\nEND:VCARD') {
+      currentQR = null;
+      canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+      canvas.width = 300; canvas.height = 300;
+      fill.style.width = '0';
+      $('roSize').textContent = 'Nothing to encode yet';
+      $('roVerdict').textContent = '';
+      say('Fill in a field above and the code appears here.');
+      setButtons(false);
+      return;
+    }
+
+    var qr;
+    try {
+      qr = qrcode(0, $('ecc').value);
+      qr.addData(data);
+      qr.make();
+    } catch (e) {
+      currentQR = null;
+      fill.style.width = '100%';
+      meter.className = 'meter over';
+      $('roSize').textContent = data.length + ' characters';
+      $('roVerdict').textContent = 'Too much';
+      say('That is more than a single QR code can hold. Remove a few links, or lower the damage tolerance, or switch to a one-link code that points at a page holding the rest.', 'bad');
+      setButtons(false);
+      return;
+    }
+
+    currentQR = qr;
+    var count = qr.getModuleCount();
+    drawCanvas(qr, canvas, 900);
+    var v = verdict(count);
+    meter.className = 'meter' + (v[1] ? ' ' + v[1] : '');
+    fill.style.width = Math.min(100, Math.round(count / 177 * 100)) + '%';
+    $('roSize').textContent = count + '×' + count + ' modules · ' + data.length + ' characters';
+    $('roVerdict').textContent = v[0];
+    say(v[2] === 2 ? 'Test this one with your own phone before you print it.' : '', v[2] === 2 ? 'bad' : '');
+    setButtons(true);
+  }
+
+  function setButtons(on) {
+    $('dlPng').disabled = !on; $('dlSvg').disabled = !on; $('printBtn').disabled = !on;
+  }
+
+  function fileStem() {
+    var n = ($('fFirst').value.trim() + '-' + $('fLast').value.trim()).replace(/^-|-$/g, '');
+    return (n || 'card-key').toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/-+/g, '-');
+  }
+
+  function saveBlob(blob, name) {
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = name;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+  }
+
+  $('dlVcf').onclick = function () {
+    var card = buildVCard();
+    if (card === 'BEGIN:VCARD\nVERSION:3.0\nEND:VCARD') {
+      say('Fill in a name first, or the contact file will be empty.', 'bad');
+      return;
+    }
+    saveBlob(new Blob([card], { type: 'text/vcard;charset=utf-8' }), fileStem() + '.vcf');
+  };
+
+  $('dlPng').onclick = function () {
+    if (!currentQR) { return; }
+    var tmp = document.createElement('canvas');
+    var px = drawCanvas(currentQR, tmp, parseInt($('px').value, 10));
+    tmp.toBlob(function (b) { saveBlob(b, fileStem() + '-qr-' + px + '.png'); }, 'image/png');
+  };
+
+  $('dlSvg').onclick = function () {
+    if (!currentQR) { return; }
+    saveBlob(new Blob([svgString(currentQR)], { type: 'image/svg+xml' }), fileStem() + '-qr.svg');
+  };
+
+  $('printBtn').onclick = function () {
+    if (!currentQR) { return; }
+    var tmp = document.createElement('canvas');
+    drawCanvas(currentQR, tmp, 1024);
+    var png = tmp.toDataURL('image/png');
+    var name = ($('fFirst').value.trim() + ' ' + $('fLast').value.trim()).trim();
+    var line2 = $('fTitle').value.trim() || $('fTagline').value.trim();
+    var line3 = $('fOrg').value.trim();
+    var cards = '';
+    for (var i = 0; i < 8; i++) {
+      cards += '<div class="c"><img src="' + png + '" alt=""><div class="t">' +
+        '<b>' + escHtml(name) + '</b>' +
+        (line2 ? '<span>' + escHtml(line2) + '</span>' : '') +
+        (line3 ? '<span>' + escHtml(line3) + '</span>' : '') +
+        '</div></div>';
+    }
+    var w = window.open('', '_blank');
+    if (!w) { say('Your browser blocked the print window. Allow pop-ups for this page and try again.', 'bad'); return; }
+    w.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Card sheet</title><style>' +
+      '@page{size:letter;margin:12mm}' +
+      'body{margin:0;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;display:grid;grid-template-columns:1fr 1fr;gap:6mm}' +
+      '.c{border:1px dashed #bbb;padding:5mm;display:flex;gap:4mm;align-items:center;break-inside:avoid}' +
+      '.c img{width:32mm;height:32mm;image-rendering:pixelated}' +
+      '.t{display:flex;flex-direction:column;gap:1mm;font-size:10pt;min-width:0}' +
+      '.t b{font-size:12pt}.t span{color:#555;overflow-wrap:anywhere}' +
+      '</style></head><body>' + cards + '</body></html>');
+    w.document.close();
+    w.focus();
+    setTimeout(function () { w.print(); }, 350);
+  };
+
+  function escHtml(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  /* ---------- Mode switching ---------- */
+  function applyMode() {
+    var m = $('mode').value;
+    $('paneCard').className = m === 'vcard' ? '' : 'hidden';
+    $('paneUrl').className = m === 'url' ? 'panel' : 'panel hidden';
+    $('paneText').className = m === 'text' ? 'panel' : 'panel hidden';
+    $('dlVcf').className = m === 'vcard' ? '' : 'hidden';
+    render();
+  }
+  $('mode').onchange = applyMode;
+
+  /* ---------- Draft ---------- */
+  var DRAFT = 'sc.draft.v1';
+  var FIELDS = ['fFirst', 'fLast', 'fPhone', 'fEmail', 'fTitle', 'fOrg', 'fTagline', 'fSite',
+                'fPortfolio', 'fBooking', 'fStreet', 'fCity', 'fRegion', 'fPostal', 'fCountry',
+                'fPref', 'mode', 'ecc', 'px', 'soleUrl', 'soleText'];
+
+  $('saveDraft').onclick = function () {
+    var d = { socials: readSocials() }, i;
+    for (i = 0; i < FIELDS.length; i++) { d[FIELDS[i]] = $(FIELDS[i]).value; }
+    try {
+      localStorage.setItem(DRAFT, JSON.stringify(d));
+      $('draftMsg').textContent = 'Saved on this device at ' + new Date().toLocaleTimeString() + '. Nothing was sent anywhere.';
+    } catch (e) {
+      $('draftMsg').textContent = 'This browser is refusing to store data, most likely private browsing. Your code still works; it just won\'t be remembered.';
+    }
+  };
+
+  $('wipe').onclick = function () {
+    if (!window.confirm('Erase your saved details and sign this key out of this device?')) { return; }
+    try { localStorage.removeItem(DRAFT); } catch (e) { }
+    SC.clearToken();
+    window.location.href = 'index.html';
+  };
+
+  function loadDraft() {
+    var d = null;
+    try { d = JSON.parse(localStorage.getItem(DRAFT)); } catch (e) { }
+    if (!d) { addSocial('linkedin', ''); addSocial('instagram', ''); return; }
+    for (var i = 0; i < FIELDS.length; i++) {
+      if (typeof d[FIELDS[i]] === 'string') { $(FIELDS[i]).value = d[FIELDS[i]]; }
+    }
+    var s = d.socials || [];
+    if (!s.length) { addSocial('linkedin', ''); }
+    for (var j = 0; j < s.length; j++) { addSocial(s[j].net, s[j].val); }
+  }
+
+  /* ---------- Wire up ---------- */
+  loadDraft();
+  var watch = FIELDS.concat([]);
+  for (var i = 0; i < watch.length; i++) {
+    var el = $(watch[i]);
+    el.addEventListener('input', render);
+    el.addEventListener('change', render);
+  }
+  applyMode();
+})();
+</script>
+</body>
+</html>

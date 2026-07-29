@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Card Key — contact QR codes that live on your own device</title>
+<meta name="description" content="A key-gated tool that turns your contact details, social links and professional info into a QR code. Nothing is uploaded. Nothing is stored on a server.">
+<link rel="stylesheet" href="assets/sc.css">
+</head>
+<body>
+
+<header class="top">
+  <div class="top-in">
+    <svg class="mark" viewBox="0 0 7 7" aria-hidden="true">
+      <rect x="0" y="0" width="7" height="1"/><rect x="0" y="6" width="7" height="1"/>
+      <rect x="0" y="1" width="1" height="5"/><rect x="6" y="1" width="1" height="5"/>
+      <rect x="2" y="2" width="3" height="3"/>
+    </svg>
+    <div>
+      <h1>Card Key</h1>
+      <p class="sub">Contact QR codes, generated on your device</p>
+    </div>
+    <nav>
+      <a href="#key">Enter key</a>
+      <a href="#request">Get a key</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <p class="lede">Everything on your business card, in one square that a phone camera already knows how to read.</p>
+
+  <p>Point a camera at it and the other person gets a contact card ready to save &mdash; name, phone, email, address, the social accounts you actually use, your title and company, your booking link, and which channel you prefer to be reached on.</p>
+
+  <p class="small">The tool runs entirely inside your browser. What you type never leaves the device you typed it on. There is no account, no upload, no tracking, and nothing for anyone to leak.</p>
+
+  <h2>What you get</h2>
+  <ul class="plain">
+    <li>A contact-card QR code (vCard) that saves straight into a phone's contacts</li>
+    <li>A contact file you can text or email, so nobody has to scan anything</li>
+    <li>Social links &mdash; Facebook, LinkedIn, Instagram, X, TikTok, YouTube, and any others you add</li>
+    <li>Professional details &mdash; tagline, title, company, portfolio, booking link</li>
+    <li>A stated preferred channel, so people reach you the way you want</li>
+    <li>PNG download at three sizes, plus SVG for print and sign work</li>
+    <li>A print sheet that lays out eight cards on one page</li>
+  </ul>
+
+  <h2>Price</h2>
+  <div class="panel">
+    <div class="price"><b>$12</b><span>one key &middot; 30 days of access</span></div>
+    <p class="small" style="margin-top:12px">Make as many codes as you like while the key is live. Generated codes never expire &mdash; a printed card keeps working long after the key does. When the key lapses, ask for another.</p>
+    <p class="small" style="margin:0"><b>Custom work from $500.</b> Branded versions, extra fields, a run of codes for a team, or a system built around your own data.</p>
+  </div>
+
+  <h2 id="key">Enter your key</h2>
+  <div class="panel">
+    <form id="keyForm" autocomplete="off">
+      <label for="keyInput">Access key</label>
+      <input class="key" id="keyInput" type="text" inputmode="latin" spellcheck="false"
+             placeholder="SC-••••-••••-••••-••" aria-describedby="keyHelp">
+      <p class="small" id="keyHelp" style="margin:-6px 0 14px">Dashes and spaces don't matter. Keys never contain the characters 0, O, 1, I or L.</p>
+      <button class="wide" type="submit" id="keyGo">Unlock the tool</button>
+    </form>
+    <div class="note" id="keyMsg" role="status" aria-live="polite"></div>
+  </div>
+
+  <h2 id="request">Request a key</h2>
+  <div class="panel">
+    <p class="small">Send the details below. You'll get payment instructions back, and your key once payment clears. Keys are issued by hand, usually the same day.</p>
+    <form id="reqForm" autocomplete="on">
+      <div class="row">
+        <div><label for="rName">Your name</label><input id="rName" type="text" autocomplete="name"></div>
+        <div><label for="rEmail">Email for the key</label><input id="rEmail" type="email" autocomplete="email"></div>
+      </div>
+      <label for="rNote">Anything you want me to know (optional)</label>
+      <textarea id="rNote" placeholder="Standard key, or something custom?"></textarea>
+      <div class="btnrow">
+        <button type="submit">Open in your mail app</button>
+        <button type="button" class="ghost" id="reqCopy">Copy the request instead</button>
+      </div>
+    </form>
+    <div class="note" id="reqMsg" role="status" aria-live="polite"></div>
+  </div>
+
+  <h2>What this deliberately does not do</h2>
+  <table>
+    <tr><th>Not included</th><th>Why</th></tr>
+    <tr><td>Payment processing</td><td>Handled directly between us. No processor sits in the middle.</td></tr>
+    <tr><td>Accounts and passwords</td><td>Nothing to sign up for, so there is no login to lose.</td></tr>
+    <tr><td>Server storage</td><td>Your details stay in your browser. There is no database.</td></tr>
+    <tr><td>Analytics</td><td>No scripts, no cookies, no third-party requests of any kind.</td></tr>
+    <tr><td>Scan tracking</td><td>The code points at your details, not at a redirect that counts you.</td></tr>
+  </table>
+
+  <footer>
+    <p><b>On what the key does.</b> The key controls access to the tool, not the safety of your data &mdash; your data was never anywhere it could be reached. The gate is enforced in your browser, which means it is a receipt rather than a lock. It is built to be honest about that.</p>
+    <p class="mono" style="font-size:12px">Card Key &middot; no cookies &middot; no analytics &middot; no server</p>
+  </footer>
+
+</main>
+
+<script src="assets/sc-core.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  /* ===== EDIT THIS: where access requests are sent ===== */
+  var CONTACT = 'Logan.Lorentz9@gmail.com';
+  /* ==================================================== */
+
+  var msg = document.getElementById('keyMsg');
+  var input = document.getElementById('keyInput');
+  var go = document.getElementById('keyGo');
+
+  function say(el, text, kind) {
+    el.className = 'note' + (kind ? ' ' + kind : '');
+    el.textContent = text;
+  }
+
+  /* Already unlocked? Say so rather than making them retype. */
+  var live = SC.activeToken();
+  if (live) {
+    var left = SC.daysLeft(live.expires);
+    say(msg, 'This device is already unlocked. ' + left + ' day' + (left === 1 ? '' : 's') + ' left on ' + SC.formatKey(live.key) + '.', 'good');
+    go.textContent = 'Open the tool';
+  }
+
+  /* Re-space the key as it is typed, so it reads like the one in the email. */
+  input.addEventListener('input', function () {
+    var raw = input.value.toUpperCase().replace(/[^A-Z0-9]/g, '').replace(/^SC/, '').slice(0, 14);
+    var out = raw.match(/.{1,4}/g);
+    input.value = raw ? 'SC-' + (out ? out.join('-') : '') : '';
+  });
+
+  document.getElementById('keyForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    if (live && !input.value.replace(/[^A-Z0-9]/gi, '').replace(/^SC/i, '')) {
+      window.location.href = 'tool.html';
+      return;
+    }
+    go.disabled = true;
+    say(msg, 'Checking the key…');
+    SC.redeem(input.value, function (r) {
+      go.disabled = false;
+      if (!r.ok) { say(msg, r.error, 'bad'); return; }
+      say(msg, 'Key accepted. Opening the tool…', 'good');
+      window.setTimeout(function () { window.location.href = 'tool.html'; }, 500);
+    });
+  });
+
+  /* ---- Request a key ---- */
+  function requestText() {
+    var n = document.getElementById('rName').value.trim();
+    var e = document.getElementById('rEmail').value.trim();
+    var note = document.getElementById('rNote').value.trim();
+    return 'Name: ' + (n || '(not given)') + '\nEmail for the key: ' + (e || '(not given)') +
+           '\nRequesting: Card Key access, 30 days, $12' +
+           (note ? '\n\nNotes:\n' + note : '');
+  }
+
+  document.getElementById('reqForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var email = document.getElementById('rEmail').value.trim();
+    if (!email) {
+      say(document.getElementById('reqMsg'), 'Add an email address so the key has somewhere to go.', 'bad');
+      return;
+    }
+    window.location.href = 'mailto:' + CONTACT +
+      '?subject=' + encodeURIComponent('Card Key access request') +
+      '&body=' + encodeURIComponent(requestText());
+  });
+
+  document.getElementById('reqCopy').addEventListener('click', function () {
+    var body = 'To: ' + CONTACT + '\nSubject: Card Key access request\n\n' + requestText();
+    var out = document.getElementById('reqMsg');
+    function fallback() {
+      var ta = document.createElement('textarea');
+      ta.value = body; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); say(out, 'Copied. Paste it into an email to ' + CONTACT + '.', 'good'); }
+      catch (err) { say(out, 'Copying is blocked here. Email ' + CONTACT + ' with your name and address.', 'bad'); }
+      document.body.removeChild(ta);
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(body).then(function () {
+        say(out, 'Copied. Paste it into an email to ' + CONTACT + '.', 'good');
+      })['catch'](fallback);
+    } else { fallback(); }
+  });
+})();
+</script>
+</body>
+</html>

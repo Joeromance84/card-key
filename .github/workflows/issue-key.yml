@@ -1,0 +1,115 @@
+name: Key registry
+
+# Issue or withdraw an access key from anywhere, including a phone.
+# Only the fingerprint travels through this workflow — never the key itself —
+# so nothing sensitive ever lands in a public run log.
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: What to do
+        type: choice
+        required: true
+        default: issue
+        options: [issue, withdraw]
+      fingerprint:
+        description: The 32-character fingerprint from the key generator
+        type: string
+        required: true
+      expires:
+        description: Expiry date, YYYY-MM-DD (issue only)
+        type: string
+        required: false
+      reference:
+        description: Public reference, e.g. SC-0007 (issue only)
+        type: string
+        required: false
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Update keys.json
+        env:
+          ACTION: ${{ inputs.action }}
+          FP: ${{ inputs.fingerprint }}
+          EXPIRES: ${{ inputs.expires }}
+          REFERENCE: ${{ inputs.reference }}
+        run: |
+          python3 - <<'PY'
+          import json, os, re, sys, datetime
+
+          action = os.environ["ACTION"]
+          fp = os.environ["FP"].strip().lower()
+          expires = os.environ.get("EXPIRES", "").strip()
+          ref = os.environ.get("REFERENCE", "").strip()
+          today = datetime.date.today()
+
+          if not re.fullmatch(r"[0-9a-f]{32}", fp):
+              sys.exit("Fingerprint must be exactly 32 hex characters. "
+                       "Use the 'Copy fingerprint' button in the key generator.")
+
+          with open("keys.json") as f:
+              reg = json.load(f)
+          keys = reg.get("keys", [])
+
+          # Housekeeping: drop anything that expired more than 30 days ago.
+          cutoff = (today - datetime.timedelta(days=30)).isoformat()
+          before = len(keys)
+          keys = [k for k in keys if k.get("expires", "") >= cutoff]
+          pruned = before - len(keys)
+
+          if action == "withdraw":
+              remaining = [k for k in keys if k.get("fp") != fp]
+              if len(remaining) == len(keys):
+                  sys.exit("That fingerprint is not on the list. Nothing to withdraw.")
+              keys = remaining
+              summary = f"withdraw {fp[:8]}…"
+          else:
+              if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", expires):
+                  sys.exit("Issuing needs an expiry date in YYYY-MM-DD form.")
+              if datetime.date.fromisoformat(expires) < today:
+                  sys.exit(f"{expires} has already passed. Pick a future date.")
+              if any(k.get("fp") == fp for k in keys):
+                  sys.exit("That fingerprint is already published. Withdraw it first if you "
+                           "want to change its expiry.")
+              keys.append({"fp": fp, "expires": expires, "label": ref or fp[:6].upper()})
+              summary = f"issue {ref or fp[:6].upper()} until {expires}"
+
+          keys.sort(key=lambda k: (k["expires"], k["fp"]))
+          reg = {"version": 1, "updated": today.isoformat(), "keys": keys}
+          with open("keys.json", "w") as f:
+              json.dump(reg, f, indent=2)
+              f.write("\n")
+
+          note = f" (pruned {pruned} long-expired)" if pruned else ""
+          with open(os.environ["GITHUB_ENV"], "a") as f:
+              f.write(f"SUMMARY={summary}{note}\n")
+          print(f"{summary}{note} — {len(keys)} key(s) now live")
+          PY
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet keys.json; then
+            echo "keys.json unchanged — nothing to push."
+            exit 0
+          fi
+          git add keys.json
+          git commit -m "keys: $SUMMARY"
+          git push
+
+      - name: Report
+        run: |
+          echo "### $SUMMARY" >> $GITHUB_STEP_SUMMARY
+          echo '```json' >> $GITHUB_STEP_SUMMARY
+          cat keys.json >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "Live within about a minute, once Pages redeploys." >> $GITHUB_STEP_SUMMARY
