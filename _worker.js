@@ -1,14 +1,21 @@
 /* Card Key — Worker entry point.
  *
  * Static files are served by the ASSETS binding. Anything under /api is
- * handled here. The browser can lie about everything; this is the only
- * thing that decides whether a key is good and whether it is already spent.
+ * handled here, and /c/<slug> serves a hosted contact card.
+ *
+ * The browser can lie about everything; this is the only thing that decides
+ * whether a key is good, whether it is already spent, and what a card holds.
  */
 
 const ALPHABET = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
 const PREFIX = 'SC';
 const LENGTH = 14;
 const DOMAIN = 'SC-KEY-v1:';
+
+/* A photo at 250px/JPEG lands around 8-20 KB once base64'd. 400 KB is a
+   generous ceiling that still refuses anything pathological. */
+const MAX_CARD_BYTES = 400 * 1024;
+const SLUG_LENGTH = 10;
 
 function json(body, status) {
   return new Response(JSON.stringify(body), {
@@ -41,6 +48,18 @@ async function fingerprint(key) {
     .slice(0, 32);
 }
 
+/* Unguessable in practice: 31^10 is about 8 x 10^14. */
+function makeSlug() {
+  const buf = new Uint8Array(SLUG_LENGTH * 2);
+  crypto.getRandomValues(buf);
+  let out = '';
+  const max = 256 - (256 % ALPHABET.length);
+  for (let i = 0; i < buf.length && out.length < SLUG_LENGTH; i++) {
+    if (buf[i] < max) { out += ALPHABET.charAt(buf[i] % ALPHABET.length); }
+  }
+  return out.toLowerCase();
+}
+
 function today() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -51,13 +70,25 @@ function daysLeft(expiry) {
   return Math.round((b - a) / 86400000);
 }
 
-/* Issuance still lives in keys.json in the repo. Only consumption lives in KV. */
 async function loadRegistry(env, request) {
   const url = new URL('/keys.json', new URL(request.url).origin);
   const res = await env.ASSETS.fetch(new Request(url.toString()));
   if (!res.ok) { throw new Error('registry unavailable'); }
   const data = await res.json();
   return (data && data.keys) || [];
+}
+
+/* A hosted card is only accepted if it really is a vCard. */
+function validateCard(vcf) {
+  if (typeof vcf !== 'string' || !vcf) { return 'A card must be supplied as text.'; }
+  const bytes = new TextEncoder().encode(vcf).length;
+  if (bytes > MAX_CARD_BYTES) {
+    return 'That card is ' + Math.round(bytes / 1024) + ' KB, over the ' +
+           Math.round(MAX_CARD_BYTES / 1024) + ' KB limit. Use a smaller photo.';
+  }
+  if (!/^BEGIN:VCARD/.test(vcf.trim())) { return 'That does not look like a contact card.'; }
+  if (!/END:VCARD\s*$/.test(vcf.trim())) { return 'That contact card is incomplete.'; }
+  return null;
 }
 
 async function handleKey(request, env) {
@@ -81,6 +112,7 @@ async function handleKey(request, env) {
   }
 
   const fp = await fingerprint(key);
+  const origin = new URL(request.url).origin;
 
   let issued;
   try { issued = await loadRegistry(env, request); }
@@ -111,24 +143,84 @@ async function handleKey(request, env) {
       label: hit.label || '',
       daysLeft: left,
       spentAt: record ? record.at : null,
+      /* Returned so somebody who lost the link can get it back with their key. */
+      slug: record && record.slug ? record.slug : null,
+      cardUrl: record && record.slug ? origin + '/c/' + record.slug : null,
       error: record
         ? 'That key has already been used to make a card, on ' + record.at + '. Each key makes one card.'
         : null
     });
   }
 
+  /* action === 'spend' */
   if (record) {
     return json({ ok: false, reason: 'spent', spentAt: record.at,
+      slug: record.slug || null,
+      cardUrl: record.slug ? origin + '/c/' + record.slug : null,
       error: 'That key was already used on ' + record.at + '. Each key makes one card.' });
+  }
+
+  /* Hosting the card is optional: a card with no photo works fine embedded
+     in the QR itself, and never needs us at all. */
+  let slug = null;
+  if (body.vcf) {
+    const bad = validateCard(body.vcf);
+    if (bad) { return json({ ok: false, reason: 'bad_card', error: bad }, 400); }
+
+    slug = makeSlug();
+    await env.SPENT.put('card:' + slug, JSON.stringify({
+      vcf: body.vcf,
+      name: typeof body.name === 'string' ? body.name.slice(0, 120) : '',
+      at: today(),
+      fp: fp
+    }));
   }
 
   await env.SPENT.put(fp, JSON.stringify({
     at: today(),
     label: hit.label || '',
-    expires: hit.expires
+    expires: hit.expires,
+    slug: slug
   }));
 
-  return json({ ok: true, reason: 'spent_now', spentAt: today(), expires: hit.expires, label: hit.label || '' });
+  return json({
+    ok: true,
+    reason: 'spent_now',
+    spentAt: today(),
+    expires: hit.expires,
+    label: hit.label || '',
+    slug: slug,
+    cardUrl: slug ? origin + '/c/' + slug : null
+  });
+}
+
+/* Serve a hosted card. This is what a phone hits when the QR is scanned. */
+async function handleCard(request, env, slug) {
+  slug = slug.replace(/\.vcf$/i, '').toLowerCase();
+  if (!/^[a-z0-9]{4,20}$/.test(slug)) {
+    return new Response('Not found.', { status: 404, headers: { 'Content-Type': 'text/plain' } });
+  }
+
+  const rec = await env.SPENT.get('card:' + slug, { type: 'json' });
+  if (!rec) {
+    return new Response(
+      'This contact card is no longer available.',
+      { status: 404, headers: { 'Content-Type': 'text/plain; charset=utf-8' } }
+    );
+  }
+
+  const name = (rec.name || 'contact').toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-|-$/g, '') || 'contact';
+
+  return new Response(rec.vcf, {
+    headers: {
+      /* text/x-vcard is what phones actually act on. */
+      'Content-Type': 'text/x-vcard; charset=utf-8',
+      'Content-Disposition': 'attachment; filename="' + name + '.vcf"',
+      /* Cards never change once made, so let them cache hard. */
+      'Cache-Control': 'public, max-age=86400',
+      'X-Content-Type-Options': 'nosniff'
+    }
+  });
 }
 
 export default {
@@ -137,19 +229,24 @@ export default {
 
     if (url.pathname === '/api/key') { return handleKey(request, env); }
 
-    /* A quick way to confirm the Worker is live and wired to KV. */
     if (url.pathname === '/api/health') {
       return json({
         ok: true,
         worker: 'card-key',
         kvBound: !!env.SPENT,
         assetsBound: !!env.ASSETS,
+        hostedCards: true,
+        maxCardKB: Math.round(MAX_CARD_BYTES / 1024),
         time: new Date().toISOString()
       });
     }
 
     if (url.pathname.startsWith('/api/')) {
       return json({ ok: false, error: 'No such endpoint.' }, 404);
+    }
+
+    if (url.pathname.startsWith('/c/')) {
+      return handleCard(request, env, url.pathname.slice(3));
     }
 
     return env.ASSETS.fetch(request);
