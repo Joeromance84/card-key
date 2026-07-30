@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Card Key — build your code</title>
+<title>Contact Card QR — build your card</title>
 <meta name="robots" content="noindex">
 <link rel="stylesheet" href="assets/sc.css">
 </head>
@@ -17,7 +17,7 @@
       <rect x="2" y="2" width="3" height="3"/>
     </svg>
     <div>
-      <h1>Card Key</h1>
+      <h1>Contact Card QR</h1>
       <p class="sub" id="hdrSub">Checking your key…</p>
     </div>
     <nav><a href="index.html">Home</a></nav>
@@ -78,6 +78,23 @@
         </div>
         <label for="fTagline">Tagline</label>
         <input id="fTagline" type="text" placeholder="One line on what you do">
+
+        <label for="fPhoto" style="margin-top:6px">Contact photo</label>
+        <input id="fPhoto" type="file" accept="image/*">
+        <div id="photoBox" class="hidden" style="margin:-6px 0 14px">
+          <div style="display:flex;gap:12px;align-items:center">
+            <img id="photoPrev" alt="Your contact photo"
+                 style="width:74px;height:74px;object-fit:cover;border:1px solid var(--rule)">
+            <div style="flex:1 1 auto;min-width:0">
+              <p class="small mono" id="photoSize" style="margin:0 0 6px"></p>
+              <button type="button" class="ghost" id="photoClear"
+                      style="padding:6px 12px;font-size:13px">Remove photo</button>
+            </div>
+          </div>
+        </div>
+        <p class="small" style="margin:-4px 0 0"><b>A photo travels in the contact file, never in the QR code.</b>
+        Even a small picture is thousands of times larger than a square can hold. The photo is resized to 250 px
+        and attached to the <span class="mono">.vcf</span>; the code itself stays exactly as scannable as it was.</p>
       </div>
 
       <h2>3 &middot; Where to find you</h2>
@@ -113,6 +130,7 @@
           <option>Phone call</option>
           <option>Email</option>
           <option>WhatsApp</option>
+          <option>Telegram</option>
           <option>Signal</option>
           <option>LinkedIn</option>
           <option>Instagram</option>
@@ -220,6 +238,7 @@
     ['pinterest', 'Pinterest', 'https://www.pinterest.com/'],
     ['snapchat', 'Snapchat', 'https://www.snapchat.com/add/'],
     ['whatsapp', 'WhatsApp', 'https://wa.me/'],
+    ['telegram', 'Telegram', 'https://t.me/'],
     ['other', 'Other', '']
   ];
 
@@ -275,6 +294,55 @@
 
   $('addSocial').onclick = function () { addSocial('linkedin', ''); render(); };
 
+  /* ---------- Contact photo ---------- */
+  var photoData = null;   /* base64 JPEG, no data: prefix */
+
+  function showPhoto() {
+    if (!photoData) {
+      $('photoBox').className = 'hidden';
+      $('fPhoto').value = '';
+      return;
+    }
+    $('photoBox').className = '';
+    $('photoPrev').src = 'data:image/jpeg;base64,' + photoData;
+    var kb = Math.round(photoData.length * 0.75 / 1024);
+    $('photoSize').textContent = kb + ' KB · in the contact file only';
+  }
+
+  $('fPhoto').onchange = function () {
+    var f = this.files && this.files[0];
+    if (!f) { return; }
+    if (!/^image\//.test(f.type)) {
+      say('That file is not an image.', 'bad');
+      this.value = '';
+      return;
+    }
+    var reader = new FileReader();
+    reader.onload = function () {
+      var img = new Image();
+      img.onload = function () {
+        /* Square centre crop down to 250 px — enough for a contact list thumbnail. */
+        var side = Math.min(img.width, img.height), out = 250;
+        var cv = document.createElement('canvas');
+        cv.width = out; cv.height = out;
+        cv.getContext('2d').drawImage(img,
+          (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, out, out);
+        photoData = cv.toDataURL('image/jpeg', 0.72).split(',')[1];
+        showPhoto();
+        render();
+      };
+      img.onerror = function () { say('That image could not be read.', 'bad'); };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(f);
+  };
+
+  $('photoClear').onclick = function () {
+    photoData = null;
+    showPhoto();
+    render();
+  };
+
   /* ---------- vCard ---------- */
   function esc(s) {
     return String(s == null ? '' : s)
@@ -287,7 +355,15 @@
     return /^[a-z][a-z0-9+.-]*:/i.test(u) ? u : 'https://' + u;
   }
 
-  function buildVCard() {
+  /* vCard 3.0 wants long lines folded at 75 octets, continuations prefixed by a space. */
+  function fold(line) {
+    if (line.length <= 75) { return line; }
+    var out = line.slice(0, 75), rest = line.slice(75);
+    while (rest.length) { out += '\r\n ' + rest.slice(0, 74); rest = rest.slice(74); }
+    return out;
+  }
+
+  function buildVCard(withPhoto) {
     var L = [];
     var first = $('fFirst').value.trim(), last = $('fLast').value.trim();
     var full = (first + ' ' + last).trim();
@@ -323,8 +399,13 @@
     if ($('fPref').value) { note.push('Reach me first by: ' + $('fPref').value); }
     if (note.length) { L.push('NOTE:' + esc(note.join(' — '))); }
 
+    /* The photo rides in the file only. In a QR code it would blow past capacity. */
+    if (withPhoto && photoData) {
+      L.push(fold('PHOTO;ENCODING=b;TYPE=JPEG:' + photoData));
+    }
+
     L.push('END:VCARD');
-    return L.join('\n');
+    return L.join(withPhoto ? '\r\n' : '\n');
   }
 
   function payload() {
@@ -448,12 +529,15 @@
   }
 
   $('dlVcf').onclick = function () {
-    var card = buildVCard();
-    if (card === 'BEGIN:VCARD\nVERSION:3.0\nEND:VCARD') {
+    if (buildVCard(false) === 'BEGIN:VCARD\nVERSION:3.0\nEND:VCARD') {
       say('Fill in a name first, or the contact file will be empty.', 'bad');
       return;
     }
+    var card = buildVCard(true);
     saveBlob(new Blob([card], { type: 'text/vcard;charset=utf-8' }), fileStem() + '.vcf');
+    var kb = (card.length / 1024).toFixed(1);
+    say('Contact file saved, ' + kb + ' KB' + (photoData ? ', photo included' : '') +
+        '. Open it on a phone to add it to Contacts.', 'good');
   };
 
   $('dlPng').onclick = function () {

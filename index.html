@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Card Key — contact QR codes that live on your own device</title>
+<title>Contact Card QR — your card in one square</title>
 <meta name="description" content="A key-gated tool that turns your contact details, social links and professional info into a QR code. Nothing is uploaded. Nothing is stored on a server.">
 <link rel="stylesheet" href="assets/sc.css">
 </head>
@@ -17,8 +17,8 @@
       <rect x="2" y="2" width="3" height="3"/>
     </svg>
     <div>
-      <h1>Card Key</h1>
-      <p class="sub">Contact QR codes, generated on your device</p>
+      <h1>Contact Card QR</h1>
+      <p class="sub">Your card, in one square</p>
     </div>
     <nav>
       <a href="#key">Enter key</a>
@@ -95,7 +95,7 @@
 
   <footer>
     <p><b>On what the key does.</b> The key controls access to the tool, not the safety of your data &mdash; your data was never anywhere it could be reached. The gate is enforced in your browser, which means it is a receipt rather than a lock. It is built to be honest about that.</p>
-    <p class="mono" style="font-size:12px">Card Key &middot; no cookies &middot; no analytics &middot; no server</p>
+    <p class="mono" style="font-size:12px">Contact Card QR &middot; no cookies &middot; no analytics &middot; no server</p>
   </footer>
 
 </main>
@@ -155,7 +155,7 @@
     var e = document.getElementById('rEmail').value.trim();
     var note = document.getElementById('rNote').value.trim();
     return 'Name: ' + (n || '(not given)') + '\nEmail for the key: ' + (e || '(not given)') +
-           '\nRequesting: Card Key access, 30 days, $12' +
+           '\nRequesting: Contact Card QR access, 30 days, $12' +
            (note ? '\n\nNotes:\n' + note : '');
   }
 
@@ -167,12 +167,12 @@
       return;
     }
     window.location.href = 'mailto:' + CONTACT +
-      '?subject=' + encodeURIComponent('Card Key access request') +
+      '?subject=' + encodeURIComponent('Contact Card QR access request') +
       '&body=' + encodeURIComponent(requestText());
   });
 
   document.getElementById('reqCopy').addEventListener('click', function () {
-    var body = 'To: ' + CONTACT + '\nSubject: Card Key access request\n\n' + requestText();
+    var body = 'To: ' + CONTACT + '\nSubject: Contact Card QR access request\n\n' + requestText();
     var out = document.getElementById('reqMsg');
     function fallback() {
       var ta = document.createElement('textarea');

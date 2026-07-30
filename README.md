@@ -1,6 +1,6 @@
-# Card Key
+# Contact Card QR
 
-A key-gated QR code tool. Static files only — no server, no database, no accounts, no third-party requests.
+A key-gated contact card QR tool. Static files only — no server, no database, no accounts, no third-party requests.
 
 Live at **https://joeromance84.github.io/card-key/**
 
