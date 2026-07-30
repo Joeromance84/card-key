@@ -1,11 +1,16 @@
 {
   "version": 1,
-  "updated": "2026-07-29",
+  "updated": "2026-07-30",
   "keys": [
     {
       "fp": "39ad352d3eb89b1c966d574cfce9d5b1",
       "expires": "2026-08-28",
       "label": "TEST-0001"
+    },
+    {
+      "fp": "a176fec9a43a52702729bdcfc76e5a9b",
+      "expires": "2027-07-30",
+      "label": "SC-0001"
     }
   ]
 }
