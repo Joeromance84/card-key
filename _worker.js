@@ -279,9 +279,73 @@ async function handleCardUpdate(request, env) {
   });
 }
 
+/* vCard folds long lines with a leading space. Undo that before reading. */
+function unfold(vcf) {
+  return String(vcf || '').replace(/\r\n[ \t]/g, '').replace(/\n[ \t]/g, '');
+}
+
+function field(vcf, name) {
+  const m = unfold(vcf).match(new RegExp('^' + name + '[^:\\r\\n]*:(.*)$', 'mi'));
+  return m ? m[1].trim().replace(/\\,/g, ',').replace(/\\;/g, ';').replace(/\\n/gi, ' ') : '';
+}
+
+function esc(s) {
+  return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+/* A phone that follows the link should see a card, not a file download. */
+function cardPage(rec, slug) {
+  const vcf = rec.vcf;
+  const name = field(vcf, 'FN') || rec.name || 'Contact';
+  const org = field(vcf, 'ORG').replace(/;/g, ' ');
+  const title = field(vcf, 'TITLE');
+  const tel = field(vcf, 'TEL');
+  const email = field(vcf, 'EMAIL');
+  const photo = (unfold(vcf).match(/^PHOTO[^:\r\n]*:(.*)$/mi) || [])[1];
+
+  const rows = [];
+  if (tel) { rows.push('<a class="row" href="tel:' + esc(tel.replace(/[^0-9+]/g, '')) + '"><b>Call</b><span>' + esc(tel) + '</span></a>'); }
+  if (tel) { rows.push('<a class="row" href="sms:' + esc(tel.replace(/[^0-9+]/g, '')) + '"><b>Text</b><span>' + esc(tel) + '</span></a>'); }
+  if (email) { rows.push('<a class="row" href="mailto:' + esc(email) + '"><b>Email</b><span>' + esc(email) + '</span></a>'); }
+
+  return `<!DOCTYPE html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>${esc(name)}</title>
+<style>
+:root{--carbon:#16181b;--paper:#e7e9e4;--card:#fbfbf9;--rule:#c9ccc5;--muted:#5f6560;--signal:#0b7a4b}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--carbon);font:16px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
+.wrap{max-width:420px;margin:0 auto;padding:28px 18px 44px}
+.card{background:var(--card);border:1px solid var(--rule);padding:24px;text-align:center}
+img.pic{width:120px;height:120px;object-fit:cover;border:1px solid var(--rule);margin-bottom:14px}
+h1{font-size:24px;letter-spacing:-.02em;margin:0 0 4px}
+.sub{color:var(--muted);font-size:14px;margin:0}
+.add{display:block;margin:22px 0 0;background:var(--carbon);color:var(--card);text-decoration:none;font-weight:600;padding:15px;border:1px solid var(--carbon)}
+.add:active{background:#000}
+.row{display:flex;justify-content:space-between;gap:12px;padding:13px 2px;border-bottom:1px solid #e4e6e0;text-decoration:none;color:var(--carbon)}
+.row b{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:700}
+.row span{text-align:right;overflow-wrap:anywhere}
+.note{color:var(--muted);font-size:12px;text-align:center;margin:20px 0 0}
+</style></head><body><div class="wrap">
+<div class="card">
+${photo ? '<img class="pic" src="data:image/jpeg;base64,' + esc(photo) + '" alt="">' : ''}
+<h1>${esc(name)}</h1>
+${title || org ? '<p class="sub">' + esc([title, org].filter(Boolean).join(' · ')) + '</p>' : ''}
+<a class="add" href="/c/${esc(slug)}.vcf?dl=1">Add to contacts</a>
+</div>
+${rows.length ? '<div class="card" style="text-align:left;margin-top:14px;padding:10px 24px 16px">' + rows.join('') + '</div>' : ''}
+<p class="note">Saving this card downloads a contact file. Open it and your phone will offer to add it.</p>
+</div></body></html>`;
+}
+
 /* Serve a hosted card. This is what a phone hits when the QR is scanned. */
-async function handleCard(request, env, slug) {
-  slug = slug.replace(/\.vcf$/i, '').toLowerCase();
+async function handleCard(request, env, rawSlug) {
+  const url = new URL(request.url);
+  const wantsFile = url.searchParams.get('dl') === '1' || /\.vcf$/i.test(rawSlug);
+  const slug = rawSlug.replace(/\.vcf$/i, '').toLowerCase();
+
   if (!/^[a-z0-9]{4,20}$/.test(slug)) {
     return new Response('Not found.', { status: 404, headers: { 'Content-Type': 'text/plain' } });
   }
@@ -292,6 +356,19 @@ async function handleCard(request, env, slug) {
       'This contact card is no longer available.',
       { status: 404, headers: { 'Content-Type': 'text/plain; charset=utf-8' } }
     );
+  }
+
+  const accept = request.headers.get('Accept') || '';
+  const isBrowser = accept.indexOf('text/html') !== -1;
+
+  /* A browser gets a readable card; anything else gets the raw file. */
+  if (isBrowser && !wantsFile) {
+    return new Response(cardPage(rec, slug), {
+      headers: {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Cache-Control': 'public, max-age=60, must-revalidate'
+      }
+    });
   }
 
   const name = (rec.name || 'contact').toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-|-$/g, '') || 'contact';
