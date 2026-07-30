@@ -212,7 +212,7 @@
         if (list[i].fp === fp) { hit = list[i]; break; }
       }
       if (!hit) {
-        cb({ ok: false, error: 'That key is not on the active list. It may have been typed incorrectly, or withdrawn.' });
+        cb({ ok: false, error: 'That key is not on the active list yet. If you have only just been sent it, wait a minute and try again — otherwise check for a mistyped character, or ask for a replacement.' });
         return;
       }
       var left = SC.daysLeft(hit.expires);
