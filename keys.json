@@ -3,6 +3,11 @@
   "updated": "2026-07-30",
   "keys": [
     {
+      "fp": "001fe3d83aec0ddfabb490588c9168fd",
+      "expires": "2026-08-01",
+      "label": "ZZ-TEST"
+    },
+    {
       "fp": "39ad352d3eb89b1c966d574cfce9d5b1",
       "expires": "2026-08-28",
       "label": "TEST-0001"
