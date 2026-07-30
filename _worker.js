@@ -337,6 +337,15 @@ export default {
       return handleCard(request, env, url.pathname.slice(3));
     }
 
-    return env.ASSETS.fetch(request);
+    /* Pages and scripts must never be served from a stale cache. A phone
+       holding yesterday's JavaScript looks exactly like a broken site, and
+       the person seeing it has no way to tell the difference. */
+    const asset = await env.ASSETS.fetch(request);
+    if (/\.(html|js|css|json)$/.test(url.pathname) || url.pathname === '/' || url.pathname.endsWith('/')) {
+      const fresh = new Response(asset.body, asset);
+      fresh.headers.set('Cache-Control', 'no-cache, must-revalidate');
+      return fresh;
+    }
+    return asset;
   }
 };
