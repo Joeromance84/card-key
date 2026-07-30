@@ -64,6 +64,33 @@ function today() {
   return new Date().toISOString().slice(0, 10);
 }
 
+/* The edit token is the only thing standing between a stranger and the
+   details on somebody's printed cards. It is shown once and stored hashed. */
+function makeToken() {
+  const buf = new Uint8Array(48);
+  crypto.getRandomValues(buf);
+  let out = '';
+  const max = 256 - (256 % ALPHABET.length);
+  for (let i = 0; i < buf.length && out.length < 20; i++) {
+    if (buf[i] < max) { out += ALPHABET.charAt(buf[i] % ALPHABET.length); }
+  }
+  return out;
+}
+
+async function hashToken(token) {
+  const bytes = new TextEncoder().encode('SC-EDIT-v1:' + token);
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  return [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+/* Constant-time compare, so a wrong token leaks nothing by how long it took. */
+function sameHash(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string' || a.length !== b.length) { return false; }
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) { diff |= a.charCodeAt(i) ^ b.charCodeAt(i); }
+  return diff === 0;
+}
+
 function daysLeft(expiry) {
   const a = Date.parse(today() + 'T00:00:00Z');
   const b = Date.parse(expiry + 'T00:00:00Z');
@@ -163,15 +190,20 @@ async function handleKey(request, env) {
   /* Hosting the card is optional: a card with no photo works fine embedded
      in the QR itself, and never needs us at all. */
   let slug = null;
+  let editToken = null;
   if (body.vcf) {
     const bad = validateCard(body.vcf);
     if (bad) { return json({ ok: false, reason: 'bad_card', error: bad }, 400); }
 
     slug = makeSlug();
+    editToken = makeToken();
     await env.SPENT.put('card:' + slug, JSON.stringify({
       vcf: body.vcf,
       name: typeof body.name === 'string' ? body.name.slice(0, 120) : '',
       at: today(),
+      updated: today(),
+      revision: 1,
+      tokenHash: await hashToken(editToken),
       fp: fp
     }));
   }
@@ -190,7 +222,60 @@ async function handleKey(request, env) {
     expires: hit.expires,
     label: hit.label || '',
     slug: slug,
-    cardUrl: slug ? origin + '/c/' + slug : null
+    cardUrl: slug ? origin + '/c/' + slug : null,
+    /* Shown once. Not recoverable, by design. */
+    editToken: editToken
+  });
+}
+
+/* Update a hosted card. The printed QR never changes; what it serves does. */
+async function handleCardUpdate(request, env) {
+  if (request.method !== 'POST') { return json({ ok: false, error: 'POST only.' }, 405); }
+  if (!env.SPENT) { return json({ ok: false, reason: 'unconfigured', error: 'Not set up yet.' }, 503); }
+
+  let body;
+  try { body = await request.json(); }
+  catch (e) { return json({ ok: false, error: 'Malformed request.' }, 400); }
+
+  const slug = String(body.slug || '').replace(/\.vcf$/i, '').toLowerCase();
+  if (!/^[a-z0-9]{4,20}$/.test(slug)) {
+    return json({ ok: false, reason: 'not_found', error: 'No such card.' }, 404);
+  }
+
+  const rec = await env.SPENT.get('card:' + slug, { type: 'json' });
+  if (!rec) { return json({ ok: false, reason: 'not_found', error: 'No such card.' }, 404); }
+
+  if (!rec.tokenHash) {
+    return json({ ok: false, reason: 'not_editable',
+      error: 'This card was made before editing existed and cannot be changed.' }, 409);
+  }
+
+  const given = await hashToken(String(body.token || ''));
+  if (!sameHash(given, rec.tokenHash)) {
+    return json({ ok: false, reason: 'denied',
+      error: 'That edit code does not match this card.' }, 403);
+  }
+
+  const bad = validateCard(body.vcf);
+  if (bad) { return json({ ok: false, reason: 'bad_card', error: bad }, 400); }
+
+  const updated = {
+    vcf: body.vcf,
+    name: typeof body.name === 'string' && body.name ? body.name.slice(0, 120) : rec.name,
+    at: rec.at,
+    updated: today(),
+    revision: (rec.revision || 1) + 1,
+    tokenHash: rec.tokenHash,
+    fp: rec.fp
+  };
+  await env.SPENT.put('card:' + slug, JSON.stringify(updated));
+
+  return json({
+    ok: true,
+    slug: slug,
+    revision: updated.revision,
+    updated: updated.updated,
+    cardUrl: new URL(request.url).origin + '/c/' + slug
   });
 }
 
@@ -216,8 +301,9 @@ async function handleCard(request, env, slug) {
       /* text/x-vcard is what phones actually act on. */
       'Content-Type': 'text/x-vcard; charset=utf-8',
       'Content-Disposition': 'attachment; filename="' + name + '.vcf"',
-      /* Cards never change once made, so let them cache hard. */
-      'Cache-Control': 'public, max-age=86400',
+      /* Cards can be edited after printing, so revalidate often.
+         A long cache here would strand people on stale details. */
+      'Cache-Control': 'public, max-age=60, must-revalidate',
       'X-Content-Type-Options': 'nosniff'
     }
   });
@@ -228,6 +314,8 @@ export default {
     const url = new URL(request.url);
 
     if (url.pathname === '/api/key') { return handleKey(request, env); }
+
+    if (url.pathname === '/api/card') { return handleCardUpdate(request, env); }
 
     if (url.pathname === '/api/health') {
       return json({
