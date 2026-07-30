@@ -1,11 +1,8 @@
-/* Server-side key enforcement for Card Key.
+/* Card Key — Worker entry point.
  *
- * The browser can lie about everything. This endpoint is the only thing that
- * decides whether a key is good and whether it has already been used.
- *
- * POST /api/key   { action: "check" | "spend", key: "SC-..." }
- *
- * Requires a KV binding named SPENT (namespace: card-key-spent).
+ * Static files are served by the ASSETS binding. Anything under /api is
+ * handled here. The browser can lie about everything; this is the only
+ * thing that decides whether a key is good and whether it is already spent.
  */
 
 const ALPHABET = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
@@ -54,21 +51,22 @@ function daysLeft(expiry) {
   return Math.round((b - a) / 86400000);
 }
 
-/* The issued list still lives in the repo; only consumption lives in KV. */
-async function loadRegistry(request) {
-  const url = new URL('/keys.json', request.url);
-  const res = await fetch(url.toString(), { cf: { cacheTtl: 30 } });
+/* Issuance still lives in keys.json in the repo. Only consumption lives in KV. */
+async function loadRegistry(env, request) {
+  const url = new URL('/keys.json', new URL(request.url).origin);
+  const res = await env.ASSETS.fetch(new Request(url.toString()));
   if (!res.ok) { throw new Error('registry unavailable'); }
   const data = await res.json();
   return (data && data.keys) || [];
 }
 
-export async function onRequestPost(context) {
-  const { request, env } = context;
-
+async function handleKey(request, env) {
+  if (request.method !== 'POST') {
+    return json({ ok: false, error: 'POST only.' }, 405);
+  }
   if (!env.SPENT) {
     return json({ ok: false, reason: 'unconfigured',
-      error: 'The key service is not finished being set up. Nothing has been charged or used.' }, 503);
+      error: 'The key service is not finished being set up. Nothing has been used.' }, 503);
   }
 
   let body;
@@ -85,7 +83,7 @@ export async function onRequestPost(context) {
   const fp = await fingerprint(key);
 
   let issued;
-  try { issued = await loadRegistry(request); }
+  try { issued = await loadRegistry(env, request); }
   catch (e) {
     return json({ ok: false, reason: 'unavailable',
       error: 'The key list could not be read just now. Try again in a moment.' }, 503);
@@ -119,7 +117,6 @@ export async function onRequestPost(context) {
     });
   }
 
-  /* action === 'spend' */
   if (record) {
     return json({ ok: false, reason: 'spent', spentAt: record.at,
       error: 'That key was already used on ' + record.at + '. Each key makes one card.' });
@@ -134,11 +131,27 @@ export async function onRequestPost(context) {
   return json({ ok: true, reason: 'spent_now', spentAt: today(), expires: hit.expires, label: hit.label || '' });
 }
 
-/* Anything other than POST gets a clear answer rather than a stack trace. */
-export async function onRequest(context) {
-  if (context.request.method === 'POST') { return onRequestPost(context); }
-  if (context.request.method === 'OPTIONS') {
-    return new Response(null, { status: 204, headers: { 'Allow': 'POST, OPTIONS' } });
+export default {
+  async fetch(request, env) {
+    const url = new URL(request.url);
+
+    if (url.pathname === '/api/key') { return handleKey(request, env); }
+
+    /* A quick way to confirm the Worker is live and wired to KV. */
+    if (url.pathname === '/api/health') {
+      return json({
+        ok: true,
+        worker: 'card-key',
+        kvBound: !!env.SPENT,
+        assetsBound: !!env.ASSETS,
+        time: new Date().toISOString()
+      });
+    }
+
+    if (url.pathname.startsWith('/api/')) {
+      return json({ ok: false, error: 'No such endpoint.' }, 404);
+    }
+
+    return env.ASSETS.fetch(request);
   }
-  return json({ ok: false, error: 'POST only.' }, 405);
-}
+};

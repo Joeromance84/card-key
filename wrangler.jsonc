@@ -1,0 +1,18 @@
+{
+  "name": "card-key",
+  "compatibility_date": "2026-07-30",
+  "main": "./_worker.js",
+  "assets": {
+    "directory": "./",
+    "binding": "ASSETS"
+  },
+  "kv_namespaces": [
+    {
+      "binding": "SPENT",
+      "id": "e6572d992f4d4bccbaaab4b9c59c8733"
+    }
+  ],
+  "observability": {
+    "enabled": true
+  }
+}
