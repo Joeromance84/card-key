@@ -386,6 +386,42 @@ async function handleCard(request, env, rawSlug) {
   });
 }
 
+/* Serve just the photo, as a real image.
+ * This is what a contacts app fetches when a vCard carries PHOTO;VALUE=URI.
+ * It lets an embedded card keep one-tap import AND still get a picture. */
+async function handlePhoto(request, env, rawSlug) {
+  const slug = rawSlug.replace(/\.(jpg|jpeg)$/i, '').toLowerCase();
+  if (!/^[a-z0-9]{4,20}$/.test(slug)) {
+    return new Response('Not found.', { status: 404, headers: { 'Content-Type': 'text/plain' } });
+  }
+
+  const rec = await env.SPENT.get('card:' + slug, { type: 'json' });
+  if (!rec) { return new Response('Not found.', { status: 404, headers: { 'Content-Type': 'text/plain' } }); }
+
+  const b64 = (unfold(rec.vcf).match(/^PHOTO[^:\r\n]*:(.*)$/mi) || [])[1];
+  if (!b64 || /^https?:/i.test(b64)) {
+    return new Response('This card has no photo.', { status: 404, headers: { 'Content-Type': 'text/plain' } });
+  }
+
+  let bytes;
+  try {
+    const bin = atob(b64.trim());
+    bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) { bytes[i] = bin.charCodeAt(i); }
+  } catch (e) {
+    return new Response('The photo could not be read.', { status: 500, headers: { 'Content-Type': 'text/plain' } });
+  }
+
+  return new Response(bytes, {
+    headers: {
+      'Content-Type': 'image/jpeg',
+      'Content-Length': String(bytes.length),
+      'Cache-Control': 'public, max-age=300, must-revalidate',
+      'X-Content-Type-Options': 'nosniff'
+    }
+  });
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -393,6 +429,10 @@ export default {
     if (url.pathname === '/api/key') { return handleKey(request, env); }
 
     if (url.pathname === '/api/card') { return handleCardUpdate(request, env); }
+
+    if (url.pathname.startsWith('/p/')) {
+      return handlePhoto(request, env, url.pathname.slice(3));
+    }
 
     if (url.pathname === '/api/health') {
       return json({
