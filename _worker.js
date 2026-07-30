@@ -333,11 +333,28 @@ h1{font-size:24px;letter-spacing:-.02em;margin:0 0 4px}
 ${photo ? '<img class="pic" src="data:image/jpeg;base64,' + esc(photo) + '" alt="">' : ''}
 <h1>${esc(name)}</h1>
 ${title || org ? '<p class="sub">' + esc([title, org].filter(Boolean).join(' · ')) + '</p>' : ''}
-<a class="add" href="/c/${esc(slug)}.vcf?dl=1">Add to contacts</a>
+<a class="add" href="/c/${esc(slug)}.vcf?dl=1" id="add">Add to contacts</a>
 </div>
 ${rows.length ? '<div class="card" style="text-align:left;margin-top:14px;padding:10px 24px 16px">' + rows.join('') + '</div>' : ''}
-<p class="note">Saving this card downloads a contact file. Open it and your phone will offer to add it.</p>
-</div></body></html>`;
+<p class="note" id="note">Your phone is downloading the contact file. Open it and it will offer to add ${esc(name.split(' ')[0] || 'this contact')}.</p>
+</div>
+<script>
+/* Start the download the moment the page opens, so the file is already
+   waiting instead of needing a tap to ask for it. An iframe does this
+   without navigating away from the card. */
+(function () {
+  try {
+    var f = document.createElement('iframe');
+    f.style.display = 'none';
+    f.src = '/c/${slug}.vcf?dl=1';
+    document.body.appendChild(f);
+  } catch (e) {
+    document.getElementById('note').textContent =
+      'Tap Add to contacts to save this card.';
+  }
+})();
+</script>
+</body></html>`;
 }
 
 /* Serve a hosted card. This is what a phone hits when the QR is scanned. */
@@ -432,28 +449,6 @@ export default {
 
     if (url.pathname.startsWith('/p/')) {
       return handlePhoto(request, env, url.pathname.slice(3));
-    }
-
-    /* Diagnostic: does this phone fetch a PHOTO carried as a URL?
-       Open it, save the contact, and see whether a picture appears. */
-    if (url.pathname === '/phototest.vcf') {
-      const origin = url.origin;
-      const card = [
-        'BEGIN:VCARD',
-        'VERSION:3.0',
-        'N:Test;Photo;;;',
-        'FN:Photo URI Test',
-        'TEL;TYPE=CELL,VOICE:+1 405 555 0142',
-        'PHOTO;VALUE=URI:' + origin + '/p/9hmh23uzyj.jpg',
-        'END:VCARD'
-      ].join('\r\n') + '\r\n';
-      return new Response(card, {
-        headers: {
-          'Content-Type': 'text/x-vcard; charset=utf-8',
-          'Content-Disposition': 'attachment; filename="phototest.vcf"',
-          'Cache-Control': 'no-store'
-        }
-      });
     }
 
     if (url.pathname === '/api/health') {
