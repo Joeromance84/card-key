@@ -29,6 +29,7 @@
   <!-- Locked state -->
   <section id="locked" class="hidden">
     <p class="lede">This tool is locked on this device.</p>
+    <p class="note bad" id="lockWhy"></p>
     <p>A key unlocks it. If you already have one, enter it on the home page &mdash; it only takes a moment and it stays unlocked here until the key runs out.</p>
     <p class="small">If you unlocked this on another phone or computer, the key works there separately. Enter it again here.</p>
     <p><a class="btn" href="index.html#key">Enter a key</a></p>
@@ -209,19 +210,36 @@
   'use strict';
 
   /* ---------- Gate ---------- */
-  var token = SC.activeToken();
-  if (!token) {
+  /* The stored token is only a cache. The published list decides, every load. */
+  var token = null;
+
+  function lock(reason) {
     document.getElementById('locked').className = '';
+    document.getElementById('app').className = 'hidden';
     document.getElementById('hdrSub').textContent = 'Locked';
     document.getElementById('hdrMark').className.baseVal = 'mark';
-    return;
+    if (reason) { document.getElementById('lockWhy').textContent = reason; }
   }
-  document.getElementById('app').className = '';
-  var left = SC.daysLeft(token.expires);
-  document.getElementById('hdrSub').textContent =
-    'Unlocked · ' + left + ' day' + (left === 1 ? '' : 's') + ' left';
-  document.getElementById('footKey').textContent =
-    SC.formatKey(token.key) + ' · expires ' + token.expires;
+
+  SC.verifyToken(function (state, t) {
+    if (state === 'revoked') { lock('That key has been withdrawn, so this device is locked again.'); return; }
+    if (state === 'expired') { lock('That key has expired. Ask for a new one to carry on.'); return; }
+    if (state === 'stale') { lock('This device has been offline too long to keep trusting the key. Connect and reload.'); return; }
+    if (state !== 'ok') { lock(''); return; }
+    start(t);
+  });
+
+  function start(tok) {
+    token = tok;
+    document.getElementById('locked').className = 'hidden';
+    document.getElementById('app').className = '';
+    var left = SC.daysLeft(token.expires);
+    document.getElementById('hdrSub').textContent =
+      'Unlocked · ' + left + ' day' + (left === 1 ? '' : 's') + ' left';
+    document.getElementById('footKey').textContent =
+      SC.formatKey(token.key) + ' · expires ' + token.expires;
+    boot();
+  }
 
   var $ = function (id) { return document.getElementById(id); };
 
@@ -635,14 +653,16 @@
   }
 
   /* ---------- Wire up ---------- */
-  loadDraft();
-  var watch = FIELDS.concat([]);
-  for (var i = 0; i < watch.length; i++) {
-    var el = $(watch[i]);
-    el.addEventListener('input', render);
-    el.addEventListener('change', render);
+  function boot() {
+    loadDraft();
+    var watch = FIELDS.concat([]);
+    for (var i = 0; i < watch.length; i++) {
+      var el = $(watch[i]);
+      el.addEventListener('input', render);
+      el.addEventListener('change', render);
+    }
+    applyMode();
   }
-  applyMode();
 })();
 </script>
 </body>

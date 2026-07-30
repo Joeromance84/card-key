@@ -165,12 +165,45 @@
     try { root.localStorage.removeItem(SC.STORE); } catch (e) { }
   };
 
-  /* Valid token = present, not expired. Checked on every page load. */
+  /* A locally stored token is a cache, never the authority. It is good on its
+     own only while the registry is unreachable, and only for a short while. */
+  SC.GRACE_DAYS = 3;
+
   SC.activeToken = function () {
     var t = SC.readToken();
     if (!t) { return null; }
     if (SC.daysLeft(t.expires) < 0) { return null; }
     return t;
+  };
+
+  /* Re-check the stored token against the published list.
+     cb(state, detail) where state is 'ok', 'revoked', 'expired', 'none' or 'stale'. */
+  SC.verifyToken = function (cb) {
+    var t = SC.readToken();
+    if (!t) { cb('none'); return; }
+    if (SC.daysLeft(t.expires) < 0) { SC.clearToken(); cb('expired', t); return; }
+
+    SC.fetchRegistry(function (err, data) {
+      if (err) {
+        /* Offline. Trust the cache briefly, then stop trusting it. */
+        var since = t.checked ? -SC.daysLeft(t.checked) : 999;
+        if (since <= SC.GRACE_DAYS) { cb('ok', t); }
+        else { cb('stale', t); }
+        return;
+      }
+      var list = (data && data.keys) || [];
+      var hit = null;
+      for (var i = 0; i < list.length; i++) {
+        if (list[i].fp === t.fp) { hit = list[i]; break; }
+      }
+      if (!hit) { SC.clearToken(); cb('revoked', t); return; }
+      if (SC.daysLeft(hit.expires) < 0) { SC.clearToken(); cb('expired', t); return; }
+      /* Expiry can be changed after issue; the published list wins. */
+      t.expires = hit.expires;
+      t.checked = SC.today();
+      SC.writeToken(t);
+      cb('ok', t);
+    });
   };
 
   SC.fetchRegistry = function (cb) {
@@ -220,7 +253,8 @@
         cb({ ok: false, error: 'That key expired on ' + hit.expires + '. Request a new one to keep using the tool.' });
         return;
       }
-      var token = { key: norm.key, fp: fp, expires: hit.expires, label: hit.label || '', redeemed: SC.today() };
+      var token = { key: norm.key, fp: fp, expires: hit.expires, label: hit.label || '',
+                    redeemed: SC.today(), checked: SC.today() };
       SC.writeToken(token);
       cb({ ok: true, token: token, daysLeft: left });
     });
