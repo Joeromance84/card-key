@@ -3,11 +3,6 @@
   "updated": "2026-07-30",
   "keys": [
     {
-      "fp": "cfcb93e336a15f200f26084869326a2b",
-      "expires": "2026-08-01",
-      "label": "ZZ-LIVE"
-    },
-    {
       "fp": "39ad352d3eb89b1c966d574cfce9d5b1",
       "expires": "2026-08-28",
       "label": "TEST-0001"
