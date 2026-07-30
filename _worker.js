@@ -434,6 +434,28 @@ export default {
       return handlePhoto(request, env, url.pathname.slice(3));
     }
 
+    /* Diagnostic: does this phone fetch a PHOTO carried as a URL?
+       Open it, save the contact, and see whether a picture appears. */
+    if (url.pathname === '/phototest.vcf') {
+      const origin = url.origin;
+      const card = [
+        'BEGIN:VCARD',
+        'VERSION:3.0',
+        'N:Test;Photo;;;',
+        'FN:Photo URI Test',
+        'TEL;TYPE=CELL,VOICE:+1 405 555 0142',
+        'PHOTO;VALUE=URI:' + origin + '/p/9hmh23uzyj.jpg',
+        'END:VCARD'
+      ].join('\r\n') + '\r\n';
+      return new Response(card, {
+        headers: {
+          'Content-Type': 'text/x-vcard; charset=utf-8',
+          'Content-Disposition': 'attachment; filename="phototest.vcf"',
+          'Cache-Control': 'no-store'
+        }
+      });
+    }
+
     if (url.pathname === '/api/health') {
       return json({
         ok: true,
