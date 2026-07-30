@@ -146,7 +146,6 @@
 
   /* ---------------- Registry + unlock ----------------------------------------------- */
 
-  SC.REGISTRY = 'keys.json';
   SC.STORE = 'sc.unlock.v1';
 
   SC.readToken = function () {
@@ -183,80 +182,63 @@
     if (!t) { cb('none'); return; }
     if (SC.daysLeft(t.expires) < 0) { SC.clearToken(); cb('expired', t); return; }
 
-    SC.fetchRegistry(function (err, data) {
+    SC.post({ action: 'check', key: t.key }, function (err, r) {
       if (err) {
-        /* Offline. Trust the cache briefly, then stop trusting it. */
         var since = t.checked ? -SC.daysLeft(t.checked) : 999;
-        if (since <= SC.GRACE_DAYS) { cb('ok', t); }
-        else { cb('stale', t); }
+        cb(since <= SC.GRACE_DAYS ? 'ok' : 'stale', t);
         return;
       }
-      var list = (data && data.keys) || [];
-      var hit = null;
-      for (var i = 0; i < list.length; i++) {
-        if (list[i].fp === t.fp) { hit = list[i]; break; }
+      if (!r) { cb('stale', t); return; }
+      if (r.reason === 'unknown') { SC.clearToken(); cb('revoked', t); return; }
+      if (r.reason === 'expired') { SC.clearToken(); cb('expired', t); return; }
+      if (r.reason === 'spent') {
+        /* Spent by us is the finished card. Spent by someone else is a stolen key. */
+        if (t.done) { t.checked = SC.today(); SC.writeToken(t); cb('ok', t); }
+        else { SC.clearToken(); cb('spent_elsewhere', t); }
+        return;
       }
-      if (!hit) { SC.clearToken(); cb('revoked', t); return; }
-      if (SC.daysLeft(hit.expires) < 0) { SC.clearToken(); cb('expired', t); return; }
-      /* Expiry can be changed after issue; the published list wins. */
-      t.expires = hit.expires;
+      t.expires = r.expires;
       t.checked = SC.today();
       SC.writeToken(t);
       cb('ok', t);
     });
   };
 
-  SC.fetchRegistry = function (cb) {
-    var done = false;
-    function finish(err, data) { if (!done) { done = true; cb(err, data); } }
+  SC.API = 'api/key';
+
+  /* Everything that decides anything happens on the server now. */
+  SC.post = function (payload, cb) {
     try {
       var x = new XMLHttpRequest();
-      x.open('GET', SC.REGISTRY + '?t=' + Date.now(), true);
+      x.open('POST', SC.API, true);
+      x.setRequestHeader('Content-Type', 'application/json');
       x.onload = function () {
-        if (x.status >= 200 && x.status < 300) {
-          try { finish(null, JSON.parse(x.responseText)); }
-          catch (e) { finish('The key registry could not be read.'); }
-        } else { finish('The key registry could not be reached.'); }
+        try { cb(null, JSON.parse(x.responseText)); }
+        catch (e) { cb('The key service gave an answer this page could not read.'); }
       };
-      x.onerror = function () { finish('The key registry could not be reached.'); };
-      x.send();
-    } catch (e) { finish('The key registry could not be reached.'); }
+      x.onerror = function () { cb('The key service could not be reached.'); };
+      x.send(JSON.stringify(payload));
+    } catch (e) { cb('The key service could not be reached.'); }
   };
 
-  /* cb(result) where result is {ok:true, token} or {ok:false, error, offlineHint} */
+  /* cb(result): {ok:true, token} or {ok:false, error, reason, cardUrl} */
   SC.redeem = function (input, cb) {
     var norm = SC.normalizeKey(input);
     if (!norm.ok) { cb({ ok: false, error: norm.error }); return; }
-    var fp = SC.fingerprint(norm.key);
 
-    SC.fetchRegistry(function (err, data) {
-      if (err) {
-        var t = SC.activeToken();
-        if (t && t.key === norm.key) {
-          cb({ ok: true, token: t, offline: true });
-        } else {
-          cb({ ok: false, error: err + ' Check your connection and try again.' });
-        }
+    SC.post({ action: 'check', key: norm.key }, function (err, r) {
+      if (err) { cb({ ok: false, error: err }); return; }
+      if (!r || !r.ok) {
+        cb({ ok: false, reason: r && r.reason, cardUrl: r && r.cardUrl,
+             error: (r && r.error) || 'That key cannot be used.' });
         return;
       }
-      var list = (data && data.keys) || [];
-      var hit = null;
-      for (var i = 0; i < list.length; i++) {
-        if (list[i].fp === fp) { hit = list[i]; break; }
-      }
-      if (!hit) {
-        cb({ ok: false, error: 'That key is not on the active list yet. If you have only just been sent it, wait a minute and try again — otherwise check for a mistyped character, or ask for a replacement.' });
-        return;
-      }
-      var left = SC.daysLeft(hit.expires);
-      if (left < 0) {
-        cb({ ok: false, error: 'That key expired on ' + hit.expires + '. Request a new one to keep using the tool.' });
-        return;
-      }
-      var token = { key: norm.key, fp: fp, expires: hit.expires, label: hit.label || '',
-                    redeemed: SC.today(), checked: SC.today() };
+      var token = {
+        key: norm.key, fp: SC.fingerprint(norm.key), expires: r.expires,
+        label: r.label || '', redeemed: SC.today(), checked: SC.today()
+      };
       SC.writeToken(token);
-      cb({ ok: true, token: token, daysLeft: left });
+      cb({ ok: true, token: token, daysLeft: r.daysLeft });
     });
   };
 

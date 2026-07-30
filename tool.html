@@ -196,6 +196,12 @@
 
     <div class="panel" id="completePanel">
       <h3 style="margin-top:0">Finish the card</h3>
+      <label for="delivery">How the code should carry your card</label>
+      <select id="delivery">
+        <option value="embed">Inside the code &mdash; works forever, needs no internet, no photo</option>
+        <option value="hosted">At a link &mdash; smaller code, carries the photo, editable later</option>
+      </select>
+      <p class="small" id="deliveryNote" style="margin:-6px 0 14px"></p>
       <p class="small">Check the code above carefully. When you press Complete, the form locks, the downloads open, and the key is used up. <b>This cannot be undone and the key will not open a second card.</b></p>
       <button class="wide" type="button" id="completeBtn">Complete and unlock the downloads</button>
       <div class="note" id="completeMsg"></div>
@@ -204,6 +210,12 @@
     <div class="panel hidden" id="finishedPanel">
       <h3 style="margin-top:0">Card complete</h3>
       <p class="small" id="finishedWhen"></p>
+      <div id="editBox" class="hidden">
+        <label style="margin-top:6px">Your edit code &mdash; write this down now</label>
+        <div class="plate mono" id="editToken" style="font-size:15px"></div>
+        <p class="small" style="margin:10px 0 0">This is the only way to change your details later without reprinting anything. It is shown once and cannot be recovered. Anyone who has it can rewrite what your printed cards say, so keep it like a password.</p>
+        <p class="small mono" id="cardUrlLine" style="margin:8px 0 0"></p>
+      </div>
       <p class="small">Your downloads are above and stay available on this device. The code itself never expires &mdash; it carries the details directly and does not point back here.</p>
     </div>
 
@@ -678,6 +690,7 @@
     $('addSocial').disabled = true;
     $('saveDraft').disabled = true;
     if ($('fPhoto')) { $('fPhoto').disabled = true; }
+    $('delivery').disabled = true;
     var clr = $('photoClear');
     if (clr) { clr.disabled = true; }
   }
@@ -697,6 +710,24 @@
       'Completed ' + (token.completedAt || 'earlier') + ' with key ' + SC.formatKey(token.key) + '.';
   }
 
+  function deliveryMode() {
+    return $('delivery').value === 'hosted' ? 'hosted' : 'embed';
+  }
+
+  /* A photo cannot fit in a QR code, so a photo card must be hosted. */
+  function syncDelivery() {
+    var hasPhoto = !!photoData;
+    var embedOpt = $('delivery').options[0];
+    embedOpt.disabled = hasPhoto;
+    if (hasPhoto && $('delivery').value === 'embed') { $('delivery').value = 'hosted'; }
+    $('deliveryNote').textContent = hasPhoto
+      ? 'You added a photo, so this card has to live at a link. A photo is thousands of times larger than a QR code can hold.'
+      : ($('delivery').value === 'hosted'
+          ? 'The code holds a short web address. Scanning fetches your card, so you can change your details later without reprinting.'
+          : 'The code holds your details outright. It works with no signal and forever, but it can never be changed.');
+  }
+  $('delivery').onchange = syncDelivery;
+
   $('completeBtn').onclick = function () {
     var data = payload();
     if (!data || data === 'BEGIN:VCARD\nVERSION:3.0\nEND:VCARD') {
@@ -710,23 +741,58 @@
     if (!window.confirm('Complete this card?\n\nThe form locks, the downloads open, and this key is used up. It will not open a second card.')) {
       return;
     }
-    frozen = data;
-    token.done = true;
-    token.card = data;
-    token.mode = $('mode').value;
-    /* The contact file carries the photo; the QR payload never does. Keep both. */
-    token.vcf = (token.mode === 'vcard') ? buildVCard(true) : '';
-    token.completedAt = SC.today();
-    token.stem = fileStem();
-    SC.writeToken(token);
-    document.getElementById('hdrSub').textContent = 'Card complete';
-    document.getElementById('footKey').textContent = SC.formatKey(token.key) + ' · used';
-    enterFinished();
-    window.scrollTo(0, 0);
+
+    var hosted = deliveryMode() === 'hosted' && $('mode').value === 'vcard';
+    var fullCard = $('mode').value === 'vcard' ? buildVCard(true) : '';
+
+    $('completeBtn').disabled = true;
+    say('Finishing your card…');
+
+    SC.post({
+      action: 'spend',
+      key: token.key,
+      vcf: hosted ? fullCard : undefined,
+      name: ($('fFirst').value.trim() + ' ' + $('fLast').value.trim()).trim()
+    }, function (err, r) {
+      if (err) {
+        $('completeBtn').disabled = false;
+        say(err + ' Nothing has been used up — try again.', 'bad');
+        return;
+      }
+      if (!r || !r.ok) {
+        $('completeBtn').disabled = false;
+        say((r && r.error) || 'The card could not be finished.', 'bad');
+        return;
+      }
+
+      token.done = true;
+      token.mode = $('mode').value;
+      token.vcf = fullCard;
+      token.card = (hosted && r.cardUrl) ? r.cardUrl : data;
+      token.hosted = !!(hosted && r.cardUrl);
+      token.cardUrl = r.cardUrl || '';
+      token.slug = r.slug || '';
+      token.completedAt = SC.today();
+      token.stem = fileStem();
+      SC.writeToken(token);
+
+      document.getElementById('hdrSub').textContent = 'Card complete';
+      document.getElementById('footKey').textContent = SC.formatKey(token.key) + ' · used';
+      say('');
+
+      if (r.editToken) {
+        $('editBox').className = '';
+        $('editToken').textContent = r.editToken;
+        $('cardUrlLine').textContent = r.cardUrl || '';
+      }
+      enterFinished();
+      window.scrollTo(0, 0);
+    });
   };
 
   /* ---------- Mode switching ---------- */
   function applyMode() {
+    if ($('delivery')) { syncDelivery(); }
     var m = $('mode').value;
     $('paneCard').className = m === 'vcard' ? '' : 'hidden';
     $('paneUrl').className = m === 'url' ? 'panel' : 'panel hidden';
