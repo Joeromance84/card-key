@@ -29,20 +29,21 @@ on:
 permissions:
   contents: write
 
+# Two key runs at once used to race each other into a push rejection.
+# Queue them instead.
+concurrency:
+  group: key-registry
+  cancel-in-progress: false
+
 jobs:
   update:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Update keys.json
-        env:
-          ACTION: ${{ inputs.action }}
-          FP: ${{ inputs.fingerprint }}
-          EXPIRES: ${{ inputs.expires }}
-          REFERENCE: ${{ inputs.reference }}
+      - name: Write the updater
         run: |
-          python3 - <<'PY'
+          cat > "$RUNNER_TEMP/update_keys.py" <<'PY'
           import json, os, re, sys, datetime
 
           action = os.environ["ACTION"]
@@ -59,7 +60,6 @@ jobs:
               reg = json.load(f)
           keys = reg.get("keys", [])
 
-          # Housekeeping: drop anything that expired more than 30 days ago.
           cutoff = (today - datetime.timedelta(days=30)).isoformat()
           before = len(keys)
           keys = [k for k in keys if k.get("expires", "") >= cutoff]
@@ -70,46 +70,90 @@ jobs:
               if len(remaining) == len(keys):
                   sys.exit("That fingerprint is not on the list. Nothing to withdraw.")
               keys = remaining
-              summary = f"withdraw {fp[:8]}…"
+              summary = "withdraw " + fp[:8]
           else:
               if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", expires):
                   sys.exit("Issuing needs an expiry date in YYYY-MM-DD form.")
               if datetime.date.fromisoformat(expires) < today:
-                  sys.exit(f"{expires} has already passed. Pick a future date.")
+                  sys.exit(expires + " has already passed. Pick a future date.")
               if any(k.get("fp") == fp for k in keys):
-                  sys.exit("That fingerprint is already published. Withdraw it first if you "
-                           "want to change its expiry.")
+                  print("Already published. Nothing to do.")
+                  open(os.environ["SUMMARY_FILE"], "w").write("")
+                  raise SystemExit(0)
               keys.append({"fp": fp, "expires": expires, "label": ref or fp[:6].upper()})
-              summary = f"issue {ref or fp[:6].upper()} until {expires}"
+              summary = "issue " + (ref or fp[:6].upper()) + " until " + expires
 
           keys.sort(key=lambda k: (k["expires"], k["fp"]))
-          reg = {"version": 1, "updated": today.isoformat(), "keys": keys}
           with open("keys.json", "w") as f:
-              json.dump(reg, f, indent=2)
+              json.dump({"version": 1, "updated": today.isoformat(), "keys": keys}, f, indent=2)
               f.write("\n")
 
-          note = f" (pruned {pruned} long-expired)" if pruned else ""
-          with open(os.environ["GITHUB_ENV"], "a") as f:
-              f.write(f"SUMMARY={summary}{note}\n")
-          print(f"{summary}{note} — {len(keys)} key(s) now live")
+          if pruned:
+              summary += " (pruned " + str(pruned) + " long-expired)"
+          open(os.environ["SUMMARY_FILE"], "w").write(summary)
+          print(summary + " - " + str(len(keys)) + " key(s) now live")
           PY
 
-      - name: Commit and push
+      - name: Publish, retrying if the remote moves under us
+        env:
+          ACTION: ${{ inputs.action }}
+          FP: ${{ inputs.fingerprint }}
+          EXPIRES: ${{ inputs.expires }}
+          REFERENCE: ${{ inputs.reference }}
         run: |
+          set -u
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          if git diff --quiet keys.json; then
-            echo "keys.json unchanged — nothing to push."
-            exit 0
-          fi
-          git add keys.json
-          git commit -m "keys: $SUMMARY"
-          git push
+          export SUMMARY_FILE="$RUNNER_TEMP/summary.txt"
+
+          for attempt in 1 2 3 4 5; do
+            # Start from whatever is actually on the remote right now.
+            git fetch origin main --quiet
+            git reset --hard origin/main --quiet
+
+            python3 "$RUNNER_TEMP/update_keys.py" || exit 1
+
+            SUMMARY="$(cat "$SUMMARY_FILE")"
+            if [ -z "$SUMMARY" ]; then
+              echo "Nothing to change."
+              echo "SUMMARY=already published" >> "$GITHUB_ENV"
+              exit 0
+            fi
+
+            if git diff --quiet keys.json; then
+              echo "keys.json unchanged."
+              echo "SUMMARY=$SUMMARY" >> "$GITHUB_ENV"
+              exit 0
+            fi
+
+            git add keys.json
+            git commit -m "keys: $SUMMARY" --quiet
+
+            if git push origin HEAD:main --quiet; then
+              echo "Published on attempt $attempt."
+              echo "SUMMARY=$SUMMARY" >> "$GITHUB_ENV"
+              exit 0
+            fi
+
+            echo "Remote moved while we worked. Retrying ($attempt of 5)."
+            sleep $((attempt * 3))
+          done
+
+          echo "::error::Could not publish after 5 attempts. The key was NOT published — run this again."
+          exit 1
 
       - name: Report
+        if: always()
         run: |
-          echo "### $SUMMARY" >> $GITHUB_STEP_SUMMARY
-          echo '```json' >> $GITHUB_STEP_SUMMARY
-          cat keys.json >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          echo "Live within about a minute, once Pages redeploys." >> $GITHUB_STEP_SUMMARY
+          if [ "${{ job.status }}" = "success" ]; then
+            echo "### Published: ${SUMMARY:-done}" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Live within about a minute." >> $GITHUB_STEP_SUMMARY
+            echo '```json' >> $GITHUB_STEP_SUMMARY
+            cat keys.json >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### The key was NOT published" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Nothing changed. Run the workflow again with the same fingerprint." >> $GITHUB_STEP_SUMMARY
+          fi
