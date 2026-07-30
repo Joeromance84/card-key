@@ -176,14 +176,35 @@
 
       <div class="note" id="qrMsg" role="status" aria-live="polite"></div>
 
-      <div class="btnrow" style="margin-top:8px">
-        <button type="button" id="dlVcf">Save contact file</button>
-        <button type="button" id="dlPng">Download PNG</button>
-        <button type="button" class="ghost" id="dlSvg">Download SVG</button>
-        <button type="button" class="ghost" id="printBtn">Print a card sheet</button>
+      <div id="downloads" class="hidden">
+        <div class="btnrow" style="margin-top:8px">
+          <button type="button" id="dlAll">Download everything</button>
+          <button type="button" id="dlVcf">Contact file</button>
+          <button type="button" class="ghost" id="dlSvg">SVG</button>
+          <button type="button" class="ghost" id="printBtn">Print a card sheet</button>
+        </div>
+        <div class="btnrow" style="margin-top:8px">
+          <button type="button" class="ghost" data-png="512">512 px</button>
+          <button type="button" class="ghost" data-png="1024">1024 px</button>
+          <button type="button" class="ghost" data-png="2048">2048 px</button>
+          <button type="button" class="ghost" data-png="4096">4096 px</button>
+        </div>
+        <p class="small" style="margin:12px 0 0"><b>Download everything</b> gives you all four PNG sizes, the SVG, and the contact file in one go. 512 for email, 1024 for general use, 2048 for print, 4096 for signage.</p>
+        <p class="small" style="margin:12px 0 0">The print sheet uses the PNG on purpose. Browsers routinely drop SVG images out of a print job without warning, which is how people end up with cards that have a blank square where the code should be. Keep the SVG for a designer or a sign shop.</p>
       </div>
-      <p class="small" style="margin:12px 0 0"><b>Save contact file</b> gives you a <span class="mono">.vcf</span> &mdash; open it on a phone and it goes straight into Contacts, no scanning and no typos. Send it by message or email when the person is not standing in front of you.</p>
-      <p class="small" style="margin:12px 0 0">The print sheet uses the PNG on purpose. Browsers routinely drop SVG images out of a print job without warning, which is how people end up with cards that have a blank square where the code should be. Keep the SVG for a designer or a sign shop.</p>
+    </div>
+
+    <div class="panel" id="completePanel">
+      <h3 style="margin-top:0">Finish the card</h3>
+      <p class="small">Check the code above carefully. When you press Complete, the form locks, the downloads open, and the key is used up. <b>This cannot be undone and the key will not open a second card.</b></p>
+      <button class="wide" type="button" id="completeBtn">Complete and unlock the downloads</button>
+      <div class="note" id="completeMsg"></div>
+    </div>
+
+    <div class="panel hidden" id="finishedPanel">
+      <h3 style="margin-top:0">Card complete</h3>
+      <p class="small" id="finishedWhen"></p>
+      <p class="small">Your downloads are above and stay available on this device. The code itself never expires &mdash; it carries the details directly and does not point back here.</p>
     </div>
 
     <h2>6 &middot; This device</h2>
@@ -237,8 +258,15 @@
     document.getElementById('hdrSub').textContent =
       'Unlocked · ' + left + ' day' + (left === 1 ? '' : 's') + ' left';
     document.getElementById('footKey').textContent =
-      SC.formatKey(token.key) + ' · expires ' + token.expires;
-    boot();
+      SC.formatKey(token.key) + (token.done ? ' · used' : ' · one card remaining');
+    if (token.done) {
+      document.getElementById('hdrSub').textContent = 'Card complete';
+      boot();
+      enterFinished();
+    } else {
+      document.getElementById('hdrSub').textContent = 'One card · unused key';
+      boot();
+    }
   }
 
   var $ = function (id) { return document.getElementById(id); };
@@ -426,7 +454,10 @@
     return L.join(withPhoto ? '\r\n' : '\n');
   }
 
+  var frozen = null;
+
   function payload() {
+    if (frozen) { return frozen; }
     var m = $('mode').value;
     if (m === 'url') { return tidyUrl($('soleUrl').value); }
     if (m === 'text') { return $('soleText').value.trim(); }
@@ -530,10 +561,12 @@
   }
 
   function setButtons(on) {
-    $('dlPng').disabled = !on; $('dlSvg').disabled = !on; $('printBtn').disabled = !on;
+    $('completeBtn').disabled = !on;
+    $('dlSvg').disabled = !on; $('printBtn').disabled = !on; $('dlAll').disabled = !on;
   }
 
   function fileStem() {
+    if (token && token.stem) { return token.stem; }
     var n = ($('fFirst').value.trim() + '-' + $('fLast').value.trim()).replace(/^-|-$/g, '');
     return (n || 'card-key').toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/-+/g, '-');
   }
@@ -547,22 +580,50 @@
   }
 
   $('dlVcf').onclick = function () {
-    if (buildVCard(false) === 'BEGIN:VCARD\nVERSION:3.0\nEND:VCARD') {
+    if (!frozen && buildVCard(false) === 'BEGIN:VCARD\nVERSION:3.0\nEND:VCARD') {
       say('Fill in a name first, or the contact file will be empty.', 'bad');
       return;
     }
-    var card = buildVCard(true);
+    var card = (token && token.vcf) ? token.vcf : buildVCard(true);
+    if (!card) { return; }
     saveBlob(new Blob([card], { type: 'text/vcard;charset=utf-8' }), fileStem() + '.vcf');
     var kb = (card.length / 1024).toFixed(1);
     say('Contact file saved, ' + kb + ' KB' + (photoData ? ', photo included' : '') +
         '. Open it on a phone to add it to Contacts.', 'good');
   };
 
-  $('dlPng').onclick = function () {
+  function savePng(target, cb) {
     if (!currentQR) { return; }
     var tmp = document.createElement('canvas');
-    var px = drawCanvas(currentQR, tmp, parseInt($('px').value, 10));
-    tmp.toBlob(function (b) { saveBlob(b, fileStem() + '-qr-' + px + '.png'); }, 'image/png');
+    var px = drawCanvas(currentQR, tmp, target);
+    tmp.toBlob(function (b) {
+      saveBlob(b, fileStem() + '-qr-' + px + '.png');
+      if (cb) { cb(); }
+    }, 'image/png');
+  }
+
+  var pngBtns = document.querySelectorAll('[data-png]');
+  for (var pb = 0; pb < pngBtns.length; pb++) {
+    (function (btn) {
+      btn.onclick = function () { savePng(parseInt(btn.getAttribute('data-png'), 10)); };
+    })(pngBtns[pb]);
+  }
+
+  /* Browsers throttle rapid downloads, so stagger them. */
+  $('dlAll').onclick = function () {
+    if (!currentQR) { return; }
+    var sizes = [512, 1024, 2048, 4096], i = 0;
+    (function next() {
+      if (i >= sizes.length) {
+        saveBlob(new Blob([svgString(currentQR)], { type: 'image/svg+xml' }), fileStem() + '-qr.svg');
+        setTimeout(function () {
+          if ($('mode').value === 'vcard') { $('dlVcf').onclick(); }
+          say('Saved four PNG sizes, the SVG' + ($('mode').value === 'vcard' ? ', and the contact file' : '') + '.', 'good');
+        }, 500);
+        return;
+      }
+      savePng(sizes[i++], function () { setTimeout(next, 450); });
+    })();
   };
 
   $('dlSvg').onclick = function () {
@@ -604,6 +665,65 @@
   function escHtml(s) {
     return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
+
+  /* ---------- Completing ---------- */
+  function freezeInputs() {
+    var i, el;
+    for (i = 0; i < FIELDS.length; i++) {
+      el = $(FIELDS[i]);
+      el.disabled = true;
+    }
+    var socialEls = $('socials').querySelectorAll('input, select, button');
+    for (i = 0; i < socialEls.length; i++) { socialEls[i].disabled = true; }
+    $('addSocial').disabled = true;
+    $('saveDraft').disabled = true;
+    if ($('fPhoto')) { $('fPhoto').disabled = true; }
+    var clr = $('photoClear');
+    if (clr) { clr.disabled = true; }
+  }
+
+  function enterFinished() {
+    /* Rebuild the frozen card from the token, not from the live form. */
+    if (token.card) {
+      $('mode').value = token.mode || 'vcard';
+      frozen = token.card;
+    }
+    freezeInputs();
+    render();
+    $('completePanel').className = 'panel hidden';
+    $('finishedPanel').className = 'panel';
+    $('downloads').className = '';
+    $('finishedWhen').textContent =
+      'Completed ' + (token.completedAt || 'earlier') + ' with key ' + SC.formatKey(token.key) + '.';
+  }
+
+  $('completeBtn').onclick = function () {
+    var data = payload();
+    if (!data || data === 'BEGIN:VCARD\nVERSION:3.0\nEND:VCARD') {
+      say('There is nothing to freeze yet. Fill the form in first.', 'bad');
+      return;
+    }
+    if (!currentQR) {
+      say('The code has not been generated. Fix the problem above, then complete.', 'bad');
+      return;
+    }
+    if (!window.confirm('Complete this card?\n\nThe form locks, the downloads open, and this key is used up. It will not open a second card.')) {
+      return;
+    }
+    frozen = data;
+    token.done = true;
+    token.card = data;
+    token.mode = $('mode').value;
+    /* The contact file carries the photo; the QR payload never does. Keep both. */
+    token.vcf = (token.mode === 'vcard') ? buildVCard(true) : '';
+    token.completedAt = SC.today();
+    token.stem = fileStem();
+    SC.writeToken(token);
+    document.getElementById('hdrSub').textContent = 'Card complete';
+    document.getElementById('footKey').textContent = SC.formatKey(token.key) + ' · used';
+    enterFinished();
+    window.scrollTo(0, 0);
+  };
 
   /* ---------- Mode switching ---------- */
   function applyMode() {
