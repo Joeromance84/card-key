@@ -1,7 +1,12 @@
 {
   "version": 1,
-  "updated": "2026-07-30",
+  "updated": "2026-08-02",
   "keys": [
+    {
+      "fp": "174d13752c8e8d955fb86ed627c3a56c",
+      "expires": "2026-08-02",
+      "label": "174D13"
+    },
     {
       "fp": "39ad352d3eb89b1c966d574cfce9d5b1",
       "expires": "2026-08-28",
